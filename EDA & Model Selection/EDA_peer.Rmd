@@ -1,0 +1,387 @@
+---
+title: "Peer Assessment I"
+output:
+  html_document:
+    pandoc_args: [
+      "--number-sections",
+      ]
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r knitr_init, echo=FALSE, cache=FALSE, warning=FALSE, message=FALSE}
+options(knitr.table.format = "html")
+options(max.print=100, scipen=999, width = 800)
+knitr::opts_chunk$set(echo=FALSE,
+	             cache=FALSE,
+               prompt=FALSE,
+	             eval = TRUE,
+               tidy=TRUE,
+               root.dir = "..",
+               fig.height = 8,
+               fig.width = 20,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+knitr::opts_knit$set(width=100, figr.prefix = T, figr.link = T)
+knitr::knit_hooks$set(inline = function(x) {
+  prettyNum(x, big.mark=",")
+})
+```
+
+First, let us load the data and necessary packages:
+
+```{r load, message = FALSE}
+load("ames_train.Rdata")
+library(BAS)
+library(data.table)
+library(dplyr)
+library(e1071)
+library(extrafont)
+library(ggplot2)
+library(MASS)
+library(reshape2)
+
+source("bma.R")
+source("bma2.R")
+source("bmaEvaluate.R")
+```
+
+#
+Make a labeled histogram (with 30 bins) of the ages of the houses in the data set, and describe the distribution.
+
+
+```{r Q1}
+# Add age to data set
+thisYear <- as.numeric(format(Sys.Date(), format = "%Y"))
+ames_train$age = thisYear - ames_train$Year.Built
+
+# Shape metrics
+skew <- skewness(ames_train$age)
+k <- kurtosis(ames_train$age)
+```
+
+```{r Q1.1}
+# Render plot
+age <- data.frame(Age = ames_train$age)
+ageHist <- ggplot2::ggplot(data = age) +
+  ggplot2::geom_histogram(ggplot2::aes(x = Age), color = "#023858", fill = "#023858") +
+  ggplot2::theme_minimal(base_size = 16) +
+  ggplot2::theme(text = ggplot2::element_text(family="Open Sans"),
+                 axis.ticks.x = ggplot2::element_blank()) +
+  ggplot2::ggtitle("Property Age Histogram") +
+  ggplot2::ylab("Count") +
+  ggplot2::xlab("Property Age (Years)") +
+  ggplot2::scale_x_continuous(labels = scales::comma)
+ageHist
+```
+`r kfigr::figr(label = "ageHist", prefix = TRUE, link = TRUE, type="Figure")`: Histogram of home ages
+
+```{r Q1.2}
+# Analyze Distribution
+ageDist <- ames_train %>% summarise(Variable = "Property Age",
+                                    Min = min(age),
+                                    Q1 = quantile(age, probs = .25),
+                                    Median = median(age),
+                                    Mean = mean(age),
+                                    Q3 = quantile(age, probs = .75),
+                                    Max = max(age),
+                                    SD = sd(age))
+knitr::kable(ageDist,digits = 2, format.args = list(big.mark = ',')) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = F, position = "center")
+
+```
+`r kfigr::figr(label = "ageDist", prefix = TRUE, link = TRUE, type="Figure")`: Distribution of home ages
+
+* * *
+House ages, ranging from a minimum of `r ageDist$Min` years to a maximum of `r ageDist$Max` years, centered around a mean and median of `r round(ageDist$Mean, 1)` and `r round(ageDist$Median, 0)` years, respectively.  As indicated by the mean in excess of the median, the distribution had a right-skew measurement of `r round(skew,3)`. This platykurtic or thin-tailed shape is evidenced by a kurtosis of `r round(k,3)`.
+
+* * *
+
+#
+The mantra in real estate is "Location, Location, Location!" Make a graphical display that relates a home price to its neighborhood in Ames, Iowa. Which summary statistics are most appropriate to use for determining the most expensive, least expensive, and most heterogeneous (having the most variation in housing price) neighborhoods? Report which neighborhoods these are based on the summary statistics of your choice. Report the value of your chosen summary statistics for these neighborhoods.
+
+
+```{r Q2.1, fig.height=12}
+# Render prices by neighborhood (pbn) violin plot
+caption <- "Median prices are indicated by white dot. Black does denote outliers."
+myPal <- colorRampPalette(RColorBrewer::brewer.pal(9, "Blues"))
+pbnPlot <- ggplot(ames_train, aes(x = Neighborhood, y = price)) +
+  geom_boxplot(outlier.colour = "black", color = "#023858", fill = "#023858") + 
+  coord_flip() +
+  theme_minimal(base_size = 20) +
+  theme(text = ggplot2::element_text(family="Open Sans"), 
+        plot.caption = element_text(size = 12, hjust = 0.5),
+        legend.position = "none") +
+  ggtitle("Prices by Neighborhood") + 
+  labs(y = "Price ($)", x = "Neighborhood", caption = caption) +
+  stat_summary(fun.y=median, geom="point", size=1, color="white") +
+  scale_fill_manual(values = myPal(length(unique(ames_train$Neighborhood)))) +
+  scale_y_continuous(labels = scales::comma)
+pbnPlot
+```
+`r kfigr::figr(label = "pbnPlot", prefix = TRUE, link = TRUE, type="Figure")`: Home prices by neighborhood
+
+
+```{r Q2.2}
+# Compute summary statistics of price by neighborhood
+pbnSummary <- ames_train %>% group_by(Neighborhood) %>% 
+  summarise(Min = min(price),
+            Q1 = quantile(price, 0.25),
+            Mean = mean(price),
+            Median = median(price), 
+            Q3 = quantile(price, 0.75),
+            Max = max(price),
+            Range = max(price) - min(price),
+            SD  = sd(price)) %>%
+  arrange(desc(Median))
+knitr::kable(pbnSummary,digits = 0, format.args = list(big.mark = ',')) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center")
+```
+`r kfigr::figr(label = "pbnSummary", prefix = TRUE, link = TRUE, type="Figure")`: Home prices by neighborhood summary statistics
+
+* * *
+Of the summary statistics shown above, the metric used to identify most and least expensive neighborhoods was the **median** price, so selected due to its robustness to outliers Heterogeneity was quantified using the **standard deviation** of prices by neighborhood. Though NridgHt had the greatest range in home prices, StoneBr, with a median home price of `r max(pbnSummary$Median)` dollars, and a standard deviation of `r max(pbnSummary$SD)` was both the most expensive and most price heterogeneous neighborhood. MeadowV was the least expensive neighborhood with a median home price of `r min(pbnSummary$Median)` dollars.
+
+* * *
+
+# 
+
+Which variable has the largest number of missing values? Explain why it makes sense that there are so many missing values for this variable.
+
+```{r Q3}
+columns <- data.frame(Columns = colnames(ames_train))
+counts <- data.frame(N = apply(ames_train, 2, function(x)  sum(is.na(x)) + sum(is.infinite(x))))
+naCounts <- cbind(columns, counts)
+mostNAs <- naCounts %>% arrange(desc(N)) %>% filter(N > 0)
+knitr::kable(head(mostNAs, 10),digits = 0, format.args = list(big.mark = ',')) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = F, position = "center")
+```
+`r kfigr::figr(label = "naVars", prefix = TRUE, link = TRUE, type="Figure")`: Variables with the most NA values.
+
+* * *
+The ten variables with the highest number of NA values are listed above. If by missing values, we mean variables with NA values, it is a valid level for several categorical variables such as Pool.QC, Misc.Features and Alley. An NA value for those variables means that  that there is no pool connected to the property, there are no other miscellaneous features, or there is no alley on the property. Excluding variables for which NA is a valid categorical level, Lot.Frontage tops the list with 167 missing data points. The distribution of values is listed below.
+
+```{r Q3_Lot.Frontage}
+summary(ames_train$Lot.Frontage)
+```
+`r kfigr::figr(label = "lotfrontage", prefix = TRUE, link = TRUE, type="Figure")`: Distribution of Lot.Frontage variable.
+
+The minimum value is 21 square feet, which suggests that the NA values could indicate that there is no lot frontage to the property. This may be the case for condominiums or duplex properties that are not street facing.
+
+* * *
+
+#
+
+We want to predict the natural log of the home prices. Candidate explanatory variables are lot size in square feet (Lot.Area), slope of property (Land.Slope), original construction date (Year.Built), remodel date (Year.Remod.Add), and the number of bedrooms above grade (Bedroom.AbvGr). Pick a model selection or model averaging method covered in the Specialization, and describe how this method works. Then, use this method to find the best multiple regression model for predicting the natural log of the home prices.
+
+## Bayesian Model Averaging (BMA)
+The objective of variable selection in linear regression is to identify a set of candidate predictors that produce the "best" model. Here, "best" model may mean the model that best predicts unseen cases, or that which is best explained by the data. Given an independent variable $Y$ and a set of $k$ candidate predictors $X_1, X_2, ..., X_k$, the "best" model is more concretely described as follows: 
+$$Y = \beta_0 + \displaystyle\sum_{j=1}^{p}\beta_jX_j + \epsilon = X\beta + \epsilon$$
+where:   
+$X_1, X_2, ..., X_p$  is a subset of $X_1, X_2, ..., X_k$  
+$X$ is a $n \times (p + 1)$ matrix containing the observed data on $p$ predictors  
+$\epsilon$ ~ $N(0,\sigma^2I)$  
+$\beta$ are the $(p + 1)$ individual unknown parameters  
+
+However, model selection exercises that lead to a single "best" model ignore model uncertainty [@Hodges1987; @Draper1995; @Raftery1997], and leads to underestimation of uncertainty when making inferences about quantities of interest [@Raftery1997].
+
+Bayesian model averaging, employed when a variety of statistically reasonable models are extant, addresses model uncertainty and leads to optimal predictive ability [@Raftery1994] by average over *all* possible combinations of predictors when making inferences about quantities of interest. The final estimates are computed as a weighted average of the parameter estimates from each of the models. 
+
+The standard BMA solution, first introduced by Leamer in 1978, defines a set of all possible models as $M = ({M_1,..., M_k})$. If $\Delta$ is the quantity of interest, such as a movie prediction or tomorrow's stock price, then the posterior distribution of $\Delta$ given the data $D$ is:
+$$Pr(\Delta|D) = \displaystyle\sum_{k=1}^KPr(\Delta|M_k, D)Pr(M_k|D)$$
+This is an average of the posterior distributions under each model weighted by the corresponding posterior model probabilities [@Raftery1997]. The posterior model probability of $M_k$ is then computed as the ratio of its marginal likelihood to the sum of the marginal likelihoods over the entire model space and is given by[@Amini]:
+
+$$Pr(M_k|D) = \frac{Pr(D|M_k)Pr(M_k)}{\displaystyle\sum_{i=1}^{K}Pr(D|M_i)Pr(M_i)}$$
+where:  
+$$Pr(D|M_k) = \int p(D|\theta_k, M_k)P(\theta_k|M_k)d\theta_k$$
+is the marginal likelihood of model $M_k$, $\theta_k$ is the vector of parameters of model $M_k$, $Pr(\theta_k|M_k)$ is the prior density of $\theta_k$ under model $M_k$, $Pr(D|\theta_k, M_k)$ is the likelihood of the data given the $M_k$ and $\theta_k$, and $Pr(M_k)$ is the prior probability that $M_k$ is the true model.
+
+At this stage, the *posterior inclusion probability* of each candidate predictor $\beta_p$, $Pr(\beta_p\neq0|D)$, is obtained by summing the posterior model probabilities over all models that include $\beta_p$. Referring back to the linear regression model; the posterior means and standard deviations of coefficient vectors $\beta$, are defined as:
+$$E[\hat{\beta}|D] = \displaystyle\sum_{j=1}^{2^k}\hat{\beta}Pr(M_j)|D),$$
+$$V[\hat{\beta}|D] = \displaystyle\sum_{j=1}^{2^k}Var[{\beta|D,M_j] +\hat\beta^2})Pr(M_j|D) - E[\beta|D]^2.$$
+Averaging over *all* models in this way provides better predictive results, as measured by the logarithmic scoring rule, than any single model $M_j$ $(j  1,...,K)$ [@Raftery1997]. 
+
+### Prior Distributions of Parameters
+To implement BMA, one must specify *prior distributions* over all parameters in all models, as well as prior probabilities of the models themselves. If prior information about the parameters and the models is available, it should be used. However, if the amount of prior information is small relative to the effort required to specify it, as is often the case, default or so-called "non-informative" or "reference" priors may be used for such analysis. The selection of default priors may affect the *integrated likelihood*, the key factor in computing posterior model weights, and so the prior density should be wide enough and reasonably flat over the region of the parameter space where the likelihood is large, but not so spread out as to decrease the prior at the posterior mode.  This decreases the integrated likelihood and may unnecessarily penalize larger models [@Raftery1994]. 
+
+Nine priors `r kfigr::figr(label = "priors", prefix = TRUE, link = TRUE, type="Table")` supported in the literature, were explored in this experiment.
+
+The **Bayesian Information Criterion (BIC) prior** is a reference prior based upon an approximation of the log marginal likelihood of parameter value $\theta$ using the Bayesian information criterion.  
+$$log Pr(\theta|M_k) \approx c - 1/2BIC_k$$
+where:   
+$$BIC_k = -2log(\hat{L}) + plog(n).$$    
+where $\hat{L}$ is the maximized value of the likelihood function of the model with respect to the parameter $\theta$, $p$ is the number of parameters and $n$ is the number of observations. The value of g associated with BIC is obtained by setting $log(n)$ to $(1+\frac{1}{g})log(1+g)$, This prior is typically flat where the likelihood is large and contains the same amount of information that would be contained in a typical single observation [@Wasserman1996]. 
+
+The **Akaike Information Criterion (AIC) prior** is the same as the BIC prior above, except AIC is used to approximate the likelihood of the data given a model $M_k$.  The AIC of the model $M_k$ is:
+$$AIC_k = 2p - 2log(\hat{L})$$
+
+The **Empirical Bayes Global Prior(EP-G)** uses an EM algorithm to find a common or global estimate of g, averaged over all models [@Liang2008a].  
+
+The **Empirical Bayes Local Prior(EP-L)** uses the MLE of g from the marginal likelihood of each model [@Liang2008a]. 
+
+The **Zellner's g-prior**  is a multivariate normal-gamma conjugate prior where $\beta \sigma^2\sim N(\beta_0, g\sigma^2S^{-1}_{XX})$, $g = n$, and the scaled variance and covariances are obtained from the ordinary least squares (OLS).
+
+**Hyper-g** is a class of g-priors based upon continuous proper hyperprior f(g), giving a mixture of g-priors where the prior on g/(1+g) is a Beta(1, alpha/2) [@Clyde2017]. **Hyper-g-n** is a special case of the Hyper-g prior where  u = g/n and u ~ Beta(1, alpha/2), to provide consistency when the null model is true [@Clyde2017]. **Hyper-g Laplace** is the same as the Hyper-g prior, but uses Laplace approximation to integrate over the prior on g. 
+
+Lastly, the **Zellner-Siow prior** places a gamma prior on n/g with G(shape = 1/2, scale = 1/2).
+
+
+### Model Priors
+For this experiment, the uniform distribution that assigns an equal prior probability to all models was used such that $Pr(M_k) = 1 / K$ for each $k$ [@Raftery1988].
+
+## Model Selection
+Models were fit under each of the nine reference priors to produce a BMA model, a highest probability model (HPM), a median probability model (MPM), and a best predictive model (BPM).  The BMA model was obtained by taking the average of the home price predictions, weighted by the posterior probability of each model. The HPM is that which has the highest posterior probability.  The MPM is the model in which all predictors have an inclusion probability greater than or equal to 0.5. The BPM coincides with the model that is closest to BMA predictions under squared error loss.
+
+Mean squared error was computed and the top 10 models with the lowest mean squared error are reported below.
+
+## Model Performance by Prior and Estimator
+```{r Q4.1}
+models <- bma(ames_train)
+eval <- bmaEvaluate(models)
+knitr::kable(eval$performance) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center")
+```
+`r kfigr::figr(label = "modelEval", prefix = TRUE, link = TRUE, type="Figure")`: Model performance in terms of squared error loss
+
+## Top 10 Models
+```{r Q4.2}
+knitr::kable(eval$top10) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = F, position = "center")
+```
+`r kfigr::figr(label = "top10", prefix = TRUE, link = TRUE, type="Figure")`: Top 10 models by squared error loss
+
+The top six models performed essentially identically from a squared error loss perspective. Moreover, each of the top 6 models used included all predictors. Since the BIC BPM model was closest to the model averaging predictions this model was selected.
+
+```{r Q4.3}
+pdc <- coef(models$BIC, estimator = "BPM")
+pdc <- data.frame(Predictor = pdc$namesx, Mean = pdc$postmean, SD = pdc$postsd, Probne0 = pdc$probne0)
+names(pdc) <- c("Predictor", "Postrior Mean", "Posterior SD", "Inclusion Probability")
+knitr::kable(pdc) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = F, position = "center")
+```
+`r kfigr::figr(label = "predictors", prefix = TRUE, link = TRUE, type="Figure")`: Model predictor estimates
+
+* * *
+
+#
+
+Which home has the largest squared residual in the previous analysis (Question 4)? Looking at all the variables in the data set, can you explain why this home stands out from the rest (what factors contribute to the high squared residual and why are those factors relevant)?
+
+* * *
+```{r Q5_1}
+# Compute prediction and squared residual.  Identify the outlier
+pred <- predict(models$BIC, estimator = "BPM")
+sqRes <- (models$BIC$Y - pred$fit)^2
+idx <- which.max(sqRes)
+lgSqRes <- sqRes[idx]
+outlier <- ames_train[idx,]
+outlier_Y <- models$BIC$Y[idx]
+outlier_YHat <- pred$fit[idx]
+outlier_YHat_USD <- exp(outlier_YHat)
+```
+
+The largest squared residual, `r round(lgSqRes, 3)`, was for property identifier `r outlier$PID`, a `r outlier$age` year old 1 story property with an actual log price of `r outlier_Y` and a predicted log price of `r outlier_YHat`. This corresponds to an actual versus predicted price of `r outlier$price` and `r outlier_YHat_USD` USD respectively.
+
+
+```{r Q5_2}
+# Extract numeric variables from observation and sample
+idx <- sapply(ames_train[idx,], is.numeric)
+sQuant <- as.data.frame(ames_train[,idx]) 
+sQuant$logPrice <- log(sQuant$price)
+idx <- sapply(outlier, is.numeric)
+oQuant <- as.data.frame(outlier[,idx])
+oQuant$logPrice <- log(oQuant$price)
+
+# Compare observation against sample
+comparison <- rbindlist(lapply(seq_along(1:ncol(sQuant)), function(i) {
+  r <- list()
+  r$var <- names(sQuant)[i]
+  r$outlier <- oQuant[,i]
+  r$min <- min(sQuant[,i])
+  r$l95CI <- quantile(sQuant[,i], 0.05, na.rm = TRUE)
+  r$mean <- mean(sQuant[,i])
+  r$u95CI <- quantile(sQuant[,i], 0.95, na.rm = TRUE)
+  r$max <- max(sQuant[,i])
+  r$sd <- sd(sQuant[,i])
+  r$se <- sd(sQuant[,i]) / sqrt(nrow(sQuant))
+  r$dev <- (r$outlier- r$mean) / r$se
+  r
+}))
+comparison <- as.data.frame(comparison %>% arrange(desc(abs(dev))))
+```
+
+To ascertain what stands out about this property, an analysis was conducted which compared the predictor values for the outlier with the distributions of the predictors for the sample.  `r kfigr::figr(label = "outlier", prefix = TRUE, link = TRUE, type="Figure")` lists the predictors vis-a-vis the sample distribution for the top 10 variables, ordered by deviation from the sample mean. What stands out immediately is that the property had the lowest sales price of any property in the training set.  
+
+That said, several factors were identified as relevant to the over prediction. 
+1. Overall.Cond: The overall condition of the property was poor.
+2. Overall.Qual The overall quality of the property was poor. 
+3. Year.Built: The property is older than approximately 95% of the properties in the training set.
+4. Lot.Area: The property was among the smallest 5%.
+5. Yr.Sold: Sold in 2010, amid the housing crisis.
+
+So, why did the model over predict. There are several reasons:
+1. Lot area and year built, two of the distinguishing features of the property had model coefficients that were essentially zero.
+2. The model had an intercept of 12 and the only negative coefficient, severe land slope, was not indicated for this property.
+3. Other factors, such as condition and quality of the property were not included in the model.
+
+Lastly, there may be factors, such as economic conditions, that have no representation in the data. 
+
+```{r Q5_3}
+knitr::kable(head(comparison, 20)) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center")
+```
+`r kfigr::figr(label = "outlier", prefix = TRUE, link = TRUE, type="Figure")`: Outlier vs. Predictor Mean Values
+
+* * *
+
+#
+
+Use the same model selection method you chose in Question 4 to again find the best multiple regression model to predict the natural log of home prices, but this time **replacing Lot.Area with log(Lot.Area)**. Do you arrive at a model including the same set of predictors?
+
+
+```{r Q6}
+models <- bma2(ames_train)
+pdc <- coef(models$BIC, estimator = "BPM")
+pdc <- data.frame(Predictor = pdc$namesx, Mean = pdc$postmean, SD = pdc$postsd, Probne0 = pdc$probne0)
+names(pdc) <- c("Predictor", "Postrior Mean", "Posterior SD", "Inclusion Probability")
+knitr::kable(pdc) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = F, position = "center")
+```
+`r kfigr::figr(label = "model2", prefix = TRUE, link = TRUE, type="Figure")`: Linear Regression Model with log(Lot.Area)
+
+Both models included the same predictors; however, the slope for log lot area was significantly greater than that of area. On the other hand, the severity of the land slope was less significant to the prediction with the new model.
+
+* * *
+
+#
+
+Do you think it is better to log transform Lot.Area, in terms of assumptions for linear regression? Make graphs of the predicted values of log home price versus the true values of log home price for the regression models selected for Lot.Area and log(Lot.Area). Referencing these two plots, provide a written support that includes a quantitative justification for your answer in the first part of question 7.
+
+```{r Q7}
+modelsA <- bma(ames_train = ames_train)
+modelsB <- bma2(ames_train = ames_train)
+predA <- predict(modelsA$BIC, estimator = "BPM")
+predB <- predict(modelsB$BIC, estimator = "BPM")
+```
+
+## Predicted versus True Log Home Price with Lot.Area
+```{r Q7-plot1}
+plot(predA$fit, modelsA$BIC$Y, xlab = "Predicted", ylab = "True")
+```
+
+## Predicted versus True Log Home Price with Log Transformed Lot.Area
+```{r Q7-plot2}
+plot(predB$fit, modelsB$BIC$Y, xlab = "Predicted", ylab = "True")
+```
+
+```{r Q7-mse}
+mse1 <- mean((modelsA$BIC$Y - predA$fit)^2)
+mse2 <- mean((modelsB$BIC$Y - predB$fit)^2)
+```
+
+
+* * *
+The second graph showing log price, predicted versus true, for the multiregression model with the log transformation on Lot.Area evinces a closer relationship between predicted versus actual. In fact, the means of the squared errors were `r round(mse1, 4)`, and `r round(mse2, 4)` for the lot area and transformed lot area variables, respectively.
+
+* * *
