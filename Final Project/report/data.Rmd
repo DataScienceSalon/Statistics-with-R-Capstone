@@ -1,0 +1,5 @@
+# Data
+The ames...
+
+## Preprocessing
+An initial data analysis was conducted to unearth data quality issues and to identify appropriate data preparation tasks that should be conducted prior to further analysis and modeling stages. Skewed continous variables, such as area and price were log transformed. Levels of several categorical variables were combined to rebalance the number of observations per level. The preprocessed data set contains.

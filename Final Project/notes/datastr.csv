@@ -1,0 +1,82 @@
+#,Variable,Str,Type,Feature Group,Category,Order,Preprocessing
+0, $ PID            , int  909176150 905476230 911128020 535377150 534177230 908128060 902135020 528228540 923426010 908186050 ...,quant,,,,
+1, $ area           , int  856 1049 1001 1039 1665 1922 936 1246 889 1072 ...,quant,Group 1,Land Configuration,4,Log transform
+2, $ price          , int  126000 139500 124900 114000 227000 198500 93000 187687 137500 140000 ...,quant,,Target,0,Log transform
+3, $ MS.SubClass    , int  30 120 30 70 60 85 20 20 20 180 ...,quant,Group 1,Usage,6,"Convert to categorical variable, collapse some levels"
+4, $ MS.Zoning      ," Factor w/ 7 levels ""A (agr)"",""C (all)"",..",qual,Group 1,Usage,6,"Convert to categorical variable, collapse some levels"
+5, $ Lot.Frontage   , int  NA 42 60 80 70 64 60 53 74 35 ...,quant,,Land Configuration,4,Impute Hmsic
+6, $ Lot.Area       , int  7890 4235 6060 8146 8400 7301 6000 3710 12395 3675 ...,quant,Group 1,Land Configuration,4,Log transform
+7, $ Street         ," Factor w/ 2 levels ""Grvl"",""Pave""",qual,,Land Configuration,4,NA
+8, $ Alley          ," Factor w/ 2 levels ""Grvl"",""Pave""",qual,,Land Configuration,4,OK
+9, $ Lot.Shape      ," Factor w/ 4 levels ""IR1"",""IR2"",""IR3"",..",qual,,Land Configuration,4,"Create binary variable, reg, not reg"
+10, $ Land.Contour   ," Factor w/ 4 levels ""Bnk"",""HLS"",""Low"",..",qual,,Land Configuration,4,Omit: Too imbalanced
+11, $ Utilities      ," Factor w/ 3 levels ""AllPub"",""NoSeWa"",..",qual,,Utilities,7,Omit: Single value
+12, $ Lot.Config     ," Factor w/ 5 levels ""Corner"",""CulDSac"",..",qual,,Land Configuration,4,Combine FR2 and FR3
+13, $ Land.Slope     ," Factor w/ 3 levels ""Gtl"",""Mod"",""Sev""",qual,,Land Configuration,4,Omit: Too imbalanced
+14, $ Neighborhood   ," Factor w/ 28 levels ""Blmngtn"",""Blueste"",..",qual,Group 1,Principal Characteristics,#N/A,Combine some neighborhoods
+15, $ Condition.1    ," Factor w/ 9 levels ""Artery"",""Feedr"",..",qual,,Overall Condition,2,Omit: Too imbalanced
+16, $ Condition.2    ," Factor w/ 8 levels ""Artery"",""Feedr"",..",qual,,Overall Condition,2,Omit: Too imbalanced
+17, $ Bldg.Type      ," Factor w/ 5 levels ""1Fam"",""2fmCon"",..",qual,,Property Configuration,3,Combine levels
+18, $ House.Style    ," Factor w/ 8 levels ""1.5Fin"",""1.5Unf"",..",qual,,Property Configuration,3,Combine levels
+19, $ Overall.Qual   , int  6 5 5 4 8 7 4 7 5 6 ...,quant,Group 1,Overall Condition,2,Combine levels at extremes
+20, $ Overall.Cond   , int  6 5 9 8 6 5 4 5 6 5 ...,quant,Group 1,Overall Condition,2,Combine levels at extremes
+21, $ Year.Built     , int  1939 1984 1930 1900 2001 2003 1953 2007 1984 2005 ...,quant,Group 1,Age & Location,1,Create log age variable
+22, $ Year.Remod.Add , int  1950 1984 2007 2003 2001 2003 1953 2008 1984 2005 ...,quant,Group 1,Age & Location,1,"Create binary remodeled variable, log time since remodel"
+23, $ Roof.Style     ," Factor w/ 6 levels ""Flat"",""Gable"",..",qual,,Exterior Configuration,5,Collapse into 3 levels
+24, $ Roof.Matl      ," Factor w/ 8 levels ""ClyTile"",""CompShg"",..",qual,,Exterior Configuration,5,Omit: Too imbalanced
+25, $ Exterior.1st   ," Factor w/ 16 levels ""AsbShng"",""AsphShn"",..",qual,,Property Configuration,3,Combine levels
+26, $ Exterior.2nd   ," Factor w/ 17 levels ""AsbShng"",""AsphShn"",..",qual,,Property Configuration,3,Combine levels
+27, $ Mas.Vnr.Type   ," Factor w/ 6 levels """",""BrkCmn"",""BrkFace"",..",qual,,Property Configuration,3,Combine levels
+28, $ Mas.Vnr.Area   , int  0 149 0 0 0 500 0 20 0 76 ...,quant,,Property Configuration,3,Log transform
+29, $ Exter.Qual     ," Factor w/ 4 levels ""Ex"",""Fa"",""Gd"",..",qual,,Overall Condition,2,Combine levels
+30, $ Exter.Cond     ," Factor w/ 5 levels ""Ex"",""Fa"",""Gd"",..",qual,,Overall Condition,2,Omit: Too imbalanced
+31, $ Foundation     ," Factor w/ 6 levels ""BrkTil"",""CBlock"",..",qual,,Property Configuration,3,Combine Levels
+32, $ Bsmt.Qual      ," Factor w/ 6 levels """",""Ex"",""Fa"",""Gd"",..",qual,,Basement,11,"Combine levels, impute missing values"
+33, $ Bsmt.Cond      ," Factor w/ 6 levels """",""Ex"",""Fa"",""Gd"",..",qual,,Basement,11,"Combine levels, impute missing values"
+34, $ Bsmt.Exposure  ," Factor w/ 5 levels """",""Av"",""Gd"",""Mn"",..",qual,,Basement,11,"Combine levels, impute missing values"
+35, $ BsmtFin.Type.1 ," Factor w/ 7 levels """",""ALQ"",""BLQ"",..",qual,,Basement,11,"Combine levels, impute missing values"
+36, $ BsmtFin.SF.1   , int  238 552 737 0 643 0 0 0 647 467 ...,quant,,Basement,11,Log transform
+37, $ BsmtFin.Type.2 ," Factor w/ 7 levels """",""ALQ"",""BLQ"",..",qual,,Basement,11,Omit: Too imbalanced
+38, $ BsmtFin.SF.2   , int  0 393 0 0 0 0 0 0 0 0 ...,quant,,Basement,11,Omit: Too imbalanced
+39, $ Bsmt.Unf.SF    , int  618 104 100 405 167 0 936 1146 217 80 ...,quant,,Basement,11,Log transform
+40, $ Total.Bsmt.SF  , int  856 1049 837 405 810 0 936 1146 864 547 ...,quant,,Basement,11,Ok
+41, $ Heating        ," Factor w/ 6 levels ""Floor"",""GasA"",..",qual,,Utilities,7,Omit: Too imbalanced
+42, $ Heating.QC     ," Factor w/ 5 levels ""Ex"",""Fa"",""Gd"",..",qual,,Utilities,7,Combine fair and poor
+43, $ Central.Air    ," Factor w/ 2 levels ""N"",""Y""",qual,,Utilities,7,Omit: Too imbalanced
+44, $ Electrical     ," Factor w/ 6 levels """",""FuseA"",""FuseF"",..",qual,,Utilities,7,Omit: Too imbalanced
+45, $ X1st.Flr.SF    , int  856 1049 1001 717 810 495 936 1246 889 1072 ...,quant,,Property Configuration,3,Log transform
+46, $ X2nd.Flr.SF    , int  0 0 0 322 855 1427 0 0 0 0 ...,quant,,Property Configuration,3,Omit: Too imbalanced
+47, $ Low.Qual.Fin.SF, int  0 0 0 0 0 0 0 0 0 0 ...,quant,,Property Configuration,3,Omit: Too imbalanced
+48, $ Bsmt.Full.Bath , int  1 1 0 0 1 0 0 0 0 1 ...,quant,,Basement,11,Create binary variable.
+49, $ Bsmt.Half.Bath , int  0 0 0 0 0 0 0 0 0 0 ...,quant,,Basement,11,Omit: Too imbalanced
+50, $ Full.Bath      , int  1 2 1 1 2 3 1 2 1 1 ...,quant,,Amenities,8,Create binary variable
+51, $ Half.Bath      , int  0 0 0 0 1 0 0 0 0 0 ...,quant,,Amenities,8,Create binary variable
+52, $ Bedroom.AbvGr  , int  2 2 2 2 3 4 2 2 3 2 ...,quant,,Property Configuration,3,ok
+53, $ Kitchen.AbvGr  , int  1 1 1 1 1 1 1 1 1 1 ...,quant,,Amenities,8,Omit: Too imbalanced
+54, $ Kitchen.Qual   ," Factor w/ 5 levels ""Ex"",""Fa"",""Gd"",..",qual,,Amenities,8,Combine levels
+55, $ TotRms.AbvGrd  , int  4 5 5 6 6 7 4 5 6 5 ...,quant,,Property Configuration,3,ok
+56, $ Functional     ," Factor w/ 8 levels ""Maj1"",""Maj2"",..",qual,,Overall Condition,2,Omit: Too imbalanced
+57, $ Fireplaces     , int  1 0 0 0 0 1 0 1 0 0 ...,quant,,Amenities,8,Combine levels
+58, $ Fireplace.Qu   ," Factor w/ 5 levels ""Ex"",""Fa"",""Gd"",..",qual,,Amenities,8,Omit: missing variables
+59, $ Garage.Type    ," Factor w/ 6 levels ""2Types"",""Attchd"",..",qual,,Garage,9,"Combine Levels, impute missing as attached"
+60, $ Garage.Yr.Blt  , int  1939 1984 1930 1940 2001 2003 1974 2007 1984 2005 ...,quant,,Garage,9,Create garage age and log transform
+61, $ Garage.Finish  ," Factor w/ 4 levels """",""Fin"",""RFn"",..",qual,,Garage,9,ok
+62, $ Garage.Cars    , int  2 1 1 1 2 2 2 2 2 2 ...,quant,,Garage,9,ok
+63, $ Garage.Area    , int  399 266 216 281 528 672 576 428 484 525 ...,quant,,Garage,9,ok
+64, $ Garage.Qual    ," Factor w/ 6 levels """",""Ex"",""Fa"",""Gd"",..",qual,,Garage,9,Omit: Too imbalanced
+65, $ Garage.Cond    ," Factor w/ 6 levels """",""Ex"",""Fa"",""Gd"",..",qual,,Garage,9,Omit: Too imbalanced
+66, $ Paved.Drive    ," Factor w/ 3 levels ""N"",""P"",""Y""",qual,,Land Configuration,4,Omit: Too imbalanced
+67, $ Wood.Deck.SF   , int  0 0 154 0 0 0 0 100 0 0 ...,quant,,Deck and Porch,10,Create binary variable
+68, $ Open.Porch.SF  , int  0 105 0 0 45 0 32 24 0 44 ...,quant,,Deck and Porch,10,Create binary variable
+69, $ Enclosed.Porch , int  0 0 42 168 0 177 112 0 0 0 ...,quant,,Deck and Porch,10,Omit: Too imbalanced
+70, $ X3Ssn.Porch    , int  0 0 86 0 0 0 0 0 0 0 ...,quant,,Deck and Porch,10,Omit: Too imbalanced
+71, $ Screen.Porch   , int  166 0 0 111 0 0 0 0 0 0 ...,quant,,Deck and Porch,10,Omit: Too imbalanced
+72, $ Pool.Area      , int  0 0 0 0 0 0 0 0 0 0 ...,quant,,Amenities,8,Omit: Too imbalanced
+73, $ Pool.QC        ," Factor w/ 4 levels ""Ex"",""Fa"",""Gd"",..",qual,,Amenities,8,Omit: Too imbalanced
+74, $ Fence          ," Factor w/ 4 levels ""GdPrv"",""GdWo"",..",qual,,Land Configuration,4,Combine categorical levels
+75, $ Misc.Feature   ," Factor w/ 5 levels ""Elev"",""Gar2"",..",qual,,Misc,12,Omit: too many missing values
+76, $ Misc.Val       , int  0 0 0 0 0 0 0 0 0 0 ...,quant,,Misc,12,Omit: Too imbalanced
+77, $ Mo.Sold        , int  3 2 11 5 11 7 2 3 4 5 ...,quant,,Transaction,0,Omit: target information
+78, $ Yr.Sold        , int  2010 2009 2007 2009 2009 2009 2009 2008 2008 2007 ...,quant,,Transaction,0,Omit: target information
+79, $ Sale.Type      ," Factor w/ 10 levels ""COD"",""Con"",""ConLD"",..",qual,,Transaction,0,Omit
+80, $ Sale.Condition ," Factor w/ 6 levels ""Abnorml"",""AdjLand"",..",qual,,Transaction,0,Omit: Filter normal sales

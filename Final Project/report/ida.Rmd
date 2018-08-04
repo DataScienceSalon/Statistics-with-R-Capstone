@@ -1,0 +1,82 @@
+---
+title: "Statistics with R Capstone: Univariate Analysis"
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r knitr_init, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(knitr.table.format = "html")
+options(max.print=100, scipen=999, width = 800)
+knitr::opts_chunk$set(echo=FALSE,
+	             cache=FALSE,
+               eval = TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+knitr::knit_hooks$set(inline = function(x) {
+  prettyNum(x, big.mark=",")
+})
+```
+
+```{r libraries}
+library(Hmisc)
+library(stats)
+library(dplyr)
+library(extrafont)
+library(ggplot2)
+library(kfigr)
+library(kableExtra)
+library(psych)
+library(xtable)
+```
+
+```{r loadData, include=FALSE}
+load("../data/ames_train.Rdata")
+train <- ames_train %>% select(-"PID")
+```
+
+```{r reformat_code, code = readLines("../R/reformat.R")[13:144], results='hide'}
+```
+
+```{r univariate_code, code = readLines("../R/univariate.R")[15:102], results='hide'}
+```
+
+```{r visual_code, code = readLines("../R/visual.R")[1:131], results='hide'}
+```
+
+```{r univariate, results='asis'}
+
+train <- reformat(train)
+
+analysis <- univariate(train)
+
+for (i in 1:length(analysis)) {
+
+  suppressMessages(print(analysis[[i]]$plot))
+
+  print(knitr::kable(analysis[[i]]$tbl, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+}
+
+```
+
+# Preprocessing
+Create log transformations the following variables
+1. Area
+2. Price
+3. Lot Frontage
+4. Lot Area
+
+1. Area: Create log transformation
+2. Price: Crate

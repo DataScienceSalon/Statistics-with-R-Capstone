@@ -1,0 +1,15 @@
+base
+knitr
+rmdformats
+lattice
+survival
+Formula
+ggplot2
+Hmisc
+dplyr
+kfigr
+kableExtra
+psych
+xtable
+extrafont
+bindrcpp
