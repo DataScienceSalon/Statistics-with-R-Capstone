@@ -49,7 +49,7 @@
 47, $ Low.Qual.Fin.SF, int  0 0 0 0 0 0 0 0 0 0 ...,quant,,Property Configuration,3,Omit: Too imbalanced
 48, $ Bsmt.Full.Bath , int  1 1 0 0 1 0 0 0 0 1 ...,quant,,Basement,11,Create binary variable.
 49, $ Bsmt.Half.Bath , int  0 0 0 0 0 0 0 0 0 0 ...,quant,,Basement,11,Omit: Too imbalanced
-50, $ Full.Bath      , int  1 2 1 1 2 3 1 2 1 1 ...,quant,,Amenities,8,Create binary variable
+50, $ Full.Bath      , int  1 2 1 1 2 3 1 2 1 1 ...,quant,,Amenities,8,Combine levels
 51, $ Half.Bath      , int  0 0 0 0 1 0 0 0 0 0 ...,quant,,Amenities,8,Create binary variable
 52, $ Bedroom.AbvGr  , int  2 2 2 2 3 4 2 2 3 2 ...,quant,,Property Configuration,3,ok
 53, $ Kitchen.AbvGr  , int  1 1 1 1 1 1 1 1 1 1 ...,quant,,Amenities,8,Omit: Too imbalanced

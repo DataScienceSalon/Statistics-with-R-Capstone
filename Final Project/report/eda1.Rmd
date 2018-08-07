@@ -1,0 +1,45 @@
+# Exploratory Data Analysis
+## Univariate Analysis
+```{r univariate_analysis}
+load("../data/raw/ames_train.Rdata")
+df <- ames_train
+df <- reformat(df)
+df <- preprocess(df, "train")
+analysis <- univariate(df)
+```
+
+### Continuous Variables
+```{r uni_continuous, results='asis'}
+nums <- colnames(df)[sapply(df, is.numeric)]
+quant <- analysis[nums]
+
+for (i in 1:length(quant)) {
+
+  n <- length(quant[[i]]$plots)
+  nCol <- floor(sqrt(n))
+  do.call("grid.arrange", c(quant[[i]]$plots, ncol = nCol))
+  cat("\n")
+
+  print(knitr::kable(quant[[i]]$outliers$stats, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+}
+
+```
+
+### Categorical Variables
+```{r uni_categorical, results='asis'}
+cats <- colnames(df)[sapply(df, is.factor)]
+qual <- analysis[cats]
+
+for (i in 1:length(qual)) {
+
+  suppressMessages(print(qual[[i]]$plot))
+
+  print(knitr::kable(qual[[i]]$tbl, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+}
+
+```
+

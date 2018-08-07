@@ -22,24 +22,37 @@ knitr::opts_chunk$set(echo=FALSE,
                comment=NA,
                message=FALSE,
                warning=FALSE)
-opts_knit$set(width=75)
+opts_knit$set(width=75, fig.height = 8)
 knitr::knit_hooks$set(inline = function(x) {
   prettyNum(x, big.mark=",")
 })
 ```
 
 ```{r libraries}
-library(Hmisc)
-library(stats)
+library(broom)
+library(corrplot)
+library(data.table)
 library(dplyr)
+library(e1071)
 library(extrafont)
 library(ggplot2)
+library(gridExtra)
+library(Hmisc)
 library(kfigr)
 library(kableExtra)
 library(psych)
+library(stats)
 library(xtable)
 ```
+```{r functions}
+source("../R/preprocess.R")
+source("../R/reformat.R")
+source("../R/convertOrdinals.R")
+source("../R/univariate.R")
+source("../R/bivariate.R")
+source("../R/visual.R")
+```
 
-```{r intro, child = 'intro.rmd'}
+```{r eda, child = 'eda1.rmd'}
 ```
 

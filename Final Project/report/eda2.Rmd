@@ -1,0 +1,73 @@
+## Bivariate Analysis 
+```{r bivariate, results='asis'}
+bi <- bivariate(df, target = "price.log")
+analysis <- bi$analysis
+lmSummaries <- bi$summary
+
+lmSummaries <- lmSummaries %>% arrange(desc(adj.r.squared))
+print(knitr::kable(lmSummaries, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+
+```
+
+
+### Continuous Variables
+```{r eda_bi_continuous, results='asis'}
+
+nums <- names(df)[sapply(df, is.numeric)]
+quant <- analysis[nums]
+for (i in 1:length(quant)) {
+
+  suppressMessages(print(quant[[i]]$plot))
+
+  print(knitr::kable(quant[[i]]$tbl, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+  
+  s1 <- broom::tidy(quant[[i]]$lm)
+  print(knitr::kable(s1, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+  s2 <- broom::glance(quant[[i]]$lm)
+  print(knitr::kable(s2, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+  
+  par(mfrow=c(2,2), pin=c(2,2))
+  plot(quant[[i]]$lm)
+  cat('\n')
+}
+
+```
+
+### Categorical Variables
+```{r eda_bi_categorical, results='asis'}
+
+cats <- names(df)[sapply(df, is.factor)]
+qual <- analysis[cats]
+for (i in 1:length(qual)) {
+
+  suppressMessages(print(qual[[1]]$box))
+  
+  suppressMessages(print(qual[[i]]$hist))
+
+  print(knitr::kable(qual[[i]]$tbl, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+  
+  s1 <- broom::tidy(qual[[i]]$lm)
+  print(knitr::kable(s1, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+  s2 <- broom::glance(qual[[i]]$lm)
+  print(knitr::kable(s2, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+  
+  par(mfrow=c(2,2), pin=c(2,2))
+  plot(qual[[i]]$lm)
+  cat('\n')
+}
+
+```

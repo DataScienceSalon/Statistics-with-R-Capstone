@@ -6,160 +6,108 @@
 #' \code{preprocess} Preprocesses the data based upon findings from IDA
 #'
 #' @param data Dataframe containing data for preprocessing
+#' @param fileName Character string containing the file name without extension 
 #'
 #' @return df Dataframe with processed data
 #' @author John James, \email{jjames@@datasciencesalon.org}
 #' @export
-preprocess <- function(data) {
+preprocess <- function(data, fileName) {
   
   df <- data
+  
+  # Convert ordinals to numeric
+  df <- convertOrdinals(df)
+
+  # Collapse categorical levels
+  lvls <- c("40", "45", "75", "85", "180", "190")
+  levels(df$MS.SubClass)[which(levels(df$MS.SubClass) %in% lvls)]  <- "Other"
+  
+  levels(df$MS.Zoning)[which(levels(df$MS.Zoning) != 'RL')]  <- "Other"
+  
+  levels(df$Lot.Config)[which(levels(df$Lot.Config) %in% c("FR2", "FR3"))]  <- "FR"
+  
+  lvls <- c("Blueste", "Greens", "GrnHill", "Landmrk", "NPkVill")
+  levels(df$Neighborhood)[which(levels(df$Neighborhood) %in% lvls)]  <- "Other"
+  
+  levels(df$Bldg.Type)[which(levels(df$Bldg.Type) != "1Fam")]  <- "Other"
+  
+  lvls <- c("1.5Unf", "2.5Fin", "2.5Unf")
+  levels(df$House.Style)[which(levels(df$House.Style) %in% lvls)]  <- "Other"
+  
+  levels(df$Roof.Style)[which(levels(df$Roof.Style) != "Gable")]  <- "Other"
+  
+  lvls <- c("VinylSd", "Wd Sdng", "MetalSd", "HdBoard", "Plywood", "CemntBd", "BrkFace")
+  levels(df$Exterior.1st)[which(!levels(df$Exterior.1st) %in% lvls)]  <- "Other"
+  
+  lvls <- c("VinylSd", "Wd Sdng", "MetalSd", "HdBoard", "Plywood", "CemntBd", "BrkFace")
+  levels(df$Exterior.2nd)[which(!levels(df$Exterior.2nd) %in% lvls)]  <- "Other"
+  
+  lvls <- c("BrkFace", "None")
+  levels(df$Mas.Vnr.Type)[which(!levels(df$Mas.Vnr.Type) %in% lvls)]  <- "Other"
+  
+  lvls <- c("CBlock", "PConc", "BrkTill")
+  levels(df$Foundation)[which(!levels(df$Foundation) %in% lvls)]  <- "Other"
+  
+  levels(df$Central.Air)[which(is.na(df$Central.Air))]  <- "N"
+  
+  lvls <- c("Attchd", "BuiltIn", "Detchd")
+  levels(df$Garage.Type)[which(!levels(df$Garage.Type) %in% lvls)]  <- "Other"
+  levels(df$Garage.Type)[which(is.na(df$Garage.Type))]  <- "Other"
+  
+  # Subset only properties sold under normal conditions
   df <- df %>% filter(Sale.Condition == "Normal")
   
-  # Convert numeric categorical variables to factors
-  df <- reformat(df)
+  # Impute missing values
+  df$Garage.Yr.Blt <- ifelse(is.na(df$Garage.Yr.Blt), df$Year.Built, df$Garage.Yr.Blt)
+  df$Garage.Cars <- ifelse(is.na(df$Garage.Cars), 0, df$Garage.Cars)
+  df$Garage.Area <- ifelse(is.na(df$Garage.Area), 0, df$Garage.Area)
+  df$BsmtFin.SF.1 <- ifelse(is.na(df$BsmtFin.SF.1), 0, df$BsmtFin.SF.1)
+  df$Bsmt.Unf.SF <- ifelse(is.na(df$Bsmt.Unf.SF), 0, df$Bsmt.Unf.SF)
+  df$Total.Bsmt.SF <- ifelse(is.na(df$Total.Bsmt.SF), 0, df$Total.Bsmt.SF)
+  df$Bsmt.Full.Bath <- ifelse(is.na(df$Bsmt.Full.Bath), 0, df$Bsmt.Full.Bath)
+  df$Bsmt.Half.Bath <- ifelse(is.na(df$Bsmt.Half.Bath), 0, df$Bsmt.Half.Bath)
   
   # Create new variables
   df$age <- 2018 - df$Year.Built 
-  df$age.remod <- 2018 = df$Year.Remod.Add
-  df$Has.Bsmt.Full.Bath <- ifelse(df$Bsmt.Full.Bath == 0, FALSE, TRUE)
-  df$Has.Half.Bath <- ifelse(df$Half.Bath > 0, TRUE, FALSE)
-  df$Has.Wood.Deck.SF <- ifelse(df$Wood.Deck.SF > 0, TRUE, FALSE)
-  df$Has.Open.Porch.SF <- ifelse(df$Open.Porch.SF > 0, TRUE, FALSE)
+  df$age.remod <- 2018 - df$Year.Remod.Add
+  df$age.garage <- 2018 - df$Garage.Yr.Blt
   
-  # Log transfer skewed numeric variables
-  df$log.Area <- log(df$area)
-  df$log.Price <- log(df$price)
-  df$log.Lot.Area <- log(df$Lot.Area)
-  df$log.Mas.Vnr.Area <- log(df$Mas.Vnr.Area)
-  df$log.BsmtFin.SF.1 <- log(df$BsmtFin.SF.1)
-  df$log.Bsmt.Unf.SF <- log(df$Bsmt.Unf.SF)
-  df$log.X1st.Flr.SF <- log(df$X1st.Flr.SF)
-  df$log.age <- log(df$age)
-  df$log.age.remod <- log(df$age.remod)
+  # Log transfer numeric variables
+  df$area.log <- log(df$area+ 1)
+  df$age.garage.log <- log(df$age.garage + 1)
+  df$price.log <- log(df$price+ 1)
+  df$Lot.Area.log <- log(df$Lot.Area+ 1)
+  df$Overall.Qual.log <- log(df$Overall.Qual+ 1)
+  df$Overall.Cond.log <- log(df$Overall.Cond+ 1)
+  df$Year.Built.log <- log(df$Year.Built+ 1)
+  df$Year.Remod.Add.log <- log(df$Year.Remod.Add+ 1)
+  df$BsmtFin.SF.1.log <- log(df$BsmtFin.SF.1+ 1)
+  df$Bsmt.Unf.SF.log <- log(df$Bsmt.Unf.SF+ 1)
+  df$Total.Bsmt.SF.log <- log(df$Total.Bsmt.SF+ 1)
+  df$X1st.Flr.SF.log <- log(df$X1st.Flr.SF+ 1)
+  df$X2nd.Flr.SF.log <- log(df$X2nd.Flr.SF+ 1)
+  df$Bsmt.Full.Bath.log <- log(df$Bsmt.Full.Bath+ 1)
+  df$Bsmt.Half.Bath.log <- log(df$Bsmt.Half.Bath+ 1)
+  df$Full.Bath.log <- log(df$Full.Bath+ 1)
+  df$Half.Bath.log <- log(df$Half.Bath+ 1)
+  df$Bedroom.AbvGr.log <- log(df$Bedroom.AbvGr+ 1)
+  df$Kitchen.AbvGr.log <- log(df$Kitchen.AbvGr+ 1)
+  df$TotRms.AbvGrd.log <- log(df$TotRms.AbvGrd+ 1)
+  df$Fireplaces.log <- log(df$Fireplaces+ 1)
+  df$Garage.Yr.Blt.log <- log(df$Garage.Yr.Blt+ 1)
+  df$Garage.Cars.log <- log(df$Garage.Cars+ 1)
+  df$Garage.Area.log <- log(df$Garage.Area+ 1)
+  df$Wood.Deck.SF.log <- log(df$Wood.Deck.SF+ 1)
+  df$Open.Porch.SF.log <- log(df$Open.Porch.SF+ 1)
+  df$Mo.Sold.log <- log(df$Mo.Sold+ 1)
+  df$Yr.Sold.log <- log(df$Yr.Sold+ 1)
+  df$age.log <- log(df$age + 1)
+  df$age.remod.log <- log(df$age.remod  +1)
   
-  # Collapse categorical levels
-  lvls <- c("40", "45", "75", "85", "180", "190")
-  df$MS.SubClass <- ifelse(df$MS.SubClass %in% lvls, "Other", df$MS.SubClass)
-  df$MS.SubClass <- factor(df$MS.SubClass)
-  
-  df$MS.Zoning <- ifelse(df$MS.Zoning ==  "RL", df$MS.Zoning , "Other")
-  df$MS.Zoning <- factor(df$MS.Zoning)
-  
-  df$Lot.Shape <- ifelse(df$Lot.Shape == "Reg", df$Lot.Shape, "Other")
-  df$Lot.Shape <- factor(df$Lot.Shape)
-  
-  df$Lot.Config <- ifelse(df$Lot.Config %in% c("FR2", "FR3"), "FR", df$Lot.Config)
-  df$Lot.Config <- factor(df$Lot.Config)
-  
-  lvls <- c("Blueste", "Greens", "GrnHill", "Landmrk", "NPkVill")
-  df$Neighborhood <- ifelse(df$Neighborhood %in% lvls, "Other", df$Neighborhood)
-  df$Neighborhood <- factor(df$Neighborhood)
-  
-  lvls <- c("1.5Unf", "2.5Fin", "2.5Unf")
-  df$House.Style <- ifelse(df$House.Style %in% lvls, "Other", df$House.Style)
-  df$House.Style <- factor(df$House.Style)
-  
-  lvls <- c(1,2,3)
-  df$Overall.Qual <- ifelse(df$Overall.Qual == 10, 9, df$Overall.Qual)
-  df$Overall.Qual <- ifelse(df$Overall.Qual %in%  lvls, 2, df$Overall.Qual)
-  df$Overall.Qual <- factor(df$Overall.Qual, 
-                              levels = c(9,8,7,6,5,4,2),
-                              labels = c("Excellent", "Very Good", "Good", 
-                                         "Above Average", "Average", 
-                                         "Below Average", "Poor"))
-  
-  lvls <- c(1,2,3)
-  df$Overall.Cond <- ifelse(df$Overall.Cond == 10, 9, df$Overall.Cond)
-  df$Overall.Cond <- ifelse(df$Overall.Cond %in%  lvls, 2, df$Overall.Cond)
-  df$Overall.Cond <- factor(df$Overall.Cond, 
-                            levels = c(9,8,7,6,5,4,2),
-                            labels = c("Excellent", "Very Good", "Good", 
-                                       "Above Average", "Average", 
-                                       "Below Average", "Poor"))
-  
-  df$Roof.Style <- ifelse(df$Roof.Style != 'Gable', 'Other', df$Roof.Style)
-  df$Roof.Style <- factor(df$Roof.Style)
-  
-  lvls <- c("VinylSd", "Wd Sdng", "MetalSd", "HdBoard", "Plywood", "CemntBd", "BrkFace")
-  df$Exterior.1st <- ifelse(df$Exterior.1st %in% lvls, df$Exterior.1st, "Other")
-  df$Exterior.1st <- factor(df$Exterior.1st)
-  
-  lvls <- c("BrkFace", "None")
-  df$Mas.Vnr.Type <- ifelse(df$Mas.Vnr.Type %in% lvls, df$Mas.Vnr.Type, "Other")
-  df$Mas.Vnr.Type <- factor(df$Mas.Vnr.Type)
-  
-  lvls <- c("Average/Typical", "Fair")
-  df$Exter.Qual <- ifelse(df$Exter.Qual %in% lvls, "Average/Typical/Fair", df$Exter.Qual)
-  df$Exter.Qual <- factor(df$Exter.Qual)
-  
-  lvls <- c("Excellent", "Good")
-  df$Exter.Cond <- ifelse(df$Exter.Cond %in% lvls, "Excellent/Good", df$Exter.Cond)
-  lvls <- c("Average/Typical", "Fair")
-  df$Exter.Cond <- ifelse(df$Exter.Cond %in% lvls, "Average/Typical/Fair", df$Exter.Cond)
-  df$Exter.Cond <- factor(df$Exter.Cond)
-  
-  lvls <- c("CBlock", "PConc", "BrkTill")
-  df$Foundation <- ifelse(df$Foundation %in% lvls, df$Foundation, "Other")
-  df$Foundation <- factor(df$Foundation)
-  
-  lvls <- c("Fair", "Poor")
-  df$Bsmt.Qual <- ifelse(df$Bsmt.Qual %in% lvls, "Fair/Poor", df$Bsmt.Qual)
-  df$Bsmt.Qual <- factor(df$Bsmt.Qual)
-  
-  lvls <- c("Fair", "Poor")
-  df$Heating.QC <- ifelse(df$Heating.QC %in% lvls, "Fair/Poor", df$Heating.QC)
-  df$Heating.QC <- factor(df$Heating.QC)
-  
-  lvls <- c("Fair", "Poor")
-  df$Kitchen.Qual <- ifelse(df$Kitchen.Qual %in% lvls, "Fair/Poor", df$Kitchen.Qual)
-  df$Kitchen.Qual <- factor(df$Kitchen.Qual)
-  
-  lvls <- c("Attchd", "BuiltIn", "Detchd")
-  df$Garage.Type <- ifelse(df$Garage.Type %in% lvls, df$Garage.Type, "Other")
-  df$Garage.Type <- factor(df$Garage.Type, labels = c("Attchd", "BuiltIn", "Detchd", "Other"))
-  
-  
-  # Impute missing values
-  df$Year.Remod.Add
-
-  # Remove select variables
-  df$Street <- NULL
-  df$Alley <- NULL
-  df$Land.Contour <- NULL
-  df$Utilities <- NULL
-  df$Land.Slope <- NULL
-  df$Condition.1 <- NULL
-  df$Condition.2 <- NULL
-  df$Roof.Matl <- NULL
-  df$Mas.Vnr.Area <- NULL
-  df$Bsmt.Cond <- NULL
-  df$BsmtFin.Type.2 <- NULL
-  df$BsmtFin.SF.2 <- NULL
-  df$Heating <- NULL
-  df$Central.Air <- NULL
-  df$Electrical <- NULL
-  df$X2nd.Flr.SF <- NULL
-  df$Low.Qual.Fin.SF <- NULL
-  df$Bsmt.Full.Bath <- NULL
-  df$Bsmt.Half.Bath <- NULL
-  df$Half.Bath <- NULL
-  df$Kitchen.AbvGr <- NULL
-  df$Functional <- NULL
-  df$Fireplace.Qu <- NULL
-  df$Garage.Qual <- NULL
-  df$Garage.Cond <- NULL
-  df$Paved.Drive <- NULL
-  df$Wood.Deck.SF <- NULL
-  df$Open.Porch.SF <- NULL
-  df$Enclosed.Porch <- NULL
-  df$X3Ssn.Porch <- NULL
-  df$Screen.Porch <- NULL
-  df$Pool.Area <- NULL
-  df$Pool.QC <- NULL
-  df$Fence <- NULL
-  df$Misc.Feature <- NULL
-  df$Misc.Val <- NULL
-  df$Sale.Type <- NULL
+  datastr <- capture.output(str(df))
+  save(df, file = file.path("../data/preprocessed",paste0(fileName, ".Rdata")))
+  write.csv(file = file.path("../data/preprocessed",paste0(fileName, ".csv")), df)
+  write.csv(file = file.path("../data/preprocessed",paste0("structure.csv")), datastr)
   
   return(df)
 }

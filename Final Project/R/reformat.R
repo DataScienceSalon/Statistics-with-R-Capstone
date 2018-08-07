@@ -23,20 +23,6 @@ reformat <- function(data) {
   data$Land.Slope <- factor(data$Land.Slope, 
                             levels = c("Gtl", "Mod", "Sev"))
 
-  data$Overall.Qual <- factor(data$Overall.Qual, 
-                              levels = c(10,9,8,7,6,5,4,3,2,1),
-                              labels = c("Very Excellent", "Excellent", 
-                                         "Very Good", "Good", "Above Average",
-                                         "Average", "Below Average", "Fair",
-                                         "Poor", "Very Poor"))
-  
-  data$Overall.Cond <- factor(data$Overall.Cond, 
-                              levels = c(10,9,8,7,6,5,4,3,2,1),
-                              labels = c("Very Excellent", "Excellent", 
-                                         "Very Good", "Good", "Above Average",
-                                         "Average", "Below Average", "Fair",
-                                         "Poor", "Very Poor"))
-  
   data$Exter.Qual <- factor(data$Exter.Qual, 
                             levels = c("Ex", "Gd", "TA", "Fa", "Po"),
                             labels = c("Excellent", "Good", "Average/Typical",

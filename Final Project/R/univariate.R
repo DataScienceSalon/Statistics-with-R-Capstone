@@ -1,4 +1,99 @@
 #------------------------------------------------------------------------------#
+#                              quantPlots                                      #
+#------------------------------------------------------------------------------#
+#' quantPlots
+#'
+#' \code{quantPlots} Returns six univariate analysis plots, including boxplots
+#' and histograms, with and without outliers
+#' 
+#' @param x Dataframe with data to be analyzed and plotted
+#' @param cname Column to be analyzed and plotted
+#' @param outliers The indices of the outliers
+#'
+#' @return Vector of outlier indices
+#' @author John James, \email{jjames@@datasciencesalon.org}
+#' @family Summarize Functions
+#' @export
+quantPlots <- function(x, cname, outliers) {
+  
+  plots <- list()
+  if (length(outliers) > 0) {
+    
+    plots$boxWithOutliers <- plotBox(x[cname], yLab = cname, rotate = TRUE,
+                                     pal = "Blues", showMean = FALSE)
+    plots$boxNoOutliers <- plotBox(x[-outliers,][cname], yLab = cname, rotate = TRUE,
+                                   pal = "Blues", showMean = FALSE)
+    plots$histWithOutliers <- plotHist(x[cname], xLab = cname, 
+                                       plotTitle = paste("Histogram:", cname, 
+                                                         "(w/Outliers)"))
+    plots$histNoOutliers <- plotHist(x[-outliers,][cname], xLab = cname, 
+                                       plotTitle = paste("Histogram:", cname, 
+                                                         "(w/o Outliers)"))
+  } else {
+    plots$boxWithOutliers <- plotBox(x[cname], yLab = cname, rotate = TRUE,
+                                     pal = "Blues")
+    plots$histWithOutliers <- plotHist(x[cname], xLab = cname, 
+                                       plotTitle = paste("Histogram:", cname))
+  }
+  plots$histSqrt <- plotHist(sqrt(x[cname]), xLab = cname, 
+                             plotTitle = paste("Histogram:", cname, 
+                                               "(Sqrt Transformation)"))
+  
+  plots$histLog <- plotHist(log(x[cname]), xLab = cname, 
+                            plotTitle = paste("Histogram:", cname))
+  
+  
+  
+  return(plots)
+  
+}
+#------------------------------------------------------------------------------#
+#                              getOutliers                                     #
+#------------------------------------------------------------------------------#
+#' getOutliers
+#'
+#' \code{getOutliers} Returns indices of outliers for a variable.
+#' 
+#' @param x Dataframe containing the data to be analyzed
+#' @param cname Character string indicating column to be analyzed
+#' @param extreme Logical, if true, returns outliers at 3*IQR, 
+#' otherwise 1.5*IQR
+#'
+#' @return Vector of outlier indices
+#' @author John James, \email{jjames@@datasciencesalon.org}
+#' @family Summarize Functions
+#' @export
+getOutliers <- function(x, cname, extreme = FALSE) {
+  
+  range <- 1.5
+  if (extreme) range <- 3
+  
+  lowerq <- quantile(x[[cname]], na.rm = TRUE)[2]
+  upperq <- quantile(x[[cname]], na.rm = TRUE)[4]
+  
+  iqr <- upperq - lowerq 
+  lowerThreshold = lowerq - (iqr * range)
+  upperThreshold = upperq + (iqr * range)
+  
+  outlierIdx <- which(x[[cname]] > upperThreshold | x[[cname]] < lowerThreshold)
+  df <- data.frame(term = cname,
+                   outliers = length(outlierIdx),
+                   pct = length(outlierIdx) / length(x[[cname]]) * 100,
+                   mean1 = mean(x[[cname]]),
+                   mean2 = mean(x[[cname]][-c(outlierIdx)]))
+  names(df) <- c("Term", "Outliers", "Outlier Pct", "Mean with Outliers", "Mean w/o Outliers")
+  cases <- x[outlierIdx,]
+  
+  outliers <- list()
+  outliers$idx <- outlierIdx
+  outliers$stats <- df
+  outliers$cases <- cases
+  
+  return(outliers)
+  
+}
+
+#------------------------------------------------------------------------------#
 #                              qualStats                                       #
 #------------------------------------------------------------------------------#
 #' qualStats
@@ -62,6 +157,10 @@ quantStats <- function(x) {
   desc <- t(as.data.frame(desc$counts))
   rownames(desc) <- NULL
   desc <- as.data.frame(desc)
+  desc$missing <- sum(is.na(x))
+  desc$pctMissing <- sum(is.na(x)) / length(x) * 100
+  desc <- desc[,c(1,2,14,3,4,5,7,9,10,11,13)]
+  
   return(desc)
 }
 
@@ -90,7 +189,8 @@ univariate <- function(x) {
     
     if (is.numeric(x[[cname]]) | is.integer(x[[cname]])) {
       a$tbl <- quantStats(x[[cname]])
-      a$plot <- plotHist(x[cname], yLab = 'Frequency', xLab = cname)
+      a$outliers <- getOutliers(x, cname)
+      a$plots <- quantPlots(x, cname, a$outliers$idx)
     } else {
       a$tbl <- qualStats(x[cname])
       a$plot <- plotBar(x[cname], yLab = 'Frequency', xLab = cname, legend = FALSE)
