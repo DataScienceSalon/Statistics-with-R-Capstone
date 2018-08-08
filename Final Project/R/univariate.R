@@ -40,7 +40,7 @@ quantPlots <- function(x, cname, outliers) {
                                                "(Sqrt Transformation)"))
   
   plots$histLog <- plotHist(log(x[cname]), xLab = cname, 
-                            plotTitle = paste("Histogram:", cname))
+                            plotTitle = paste("Histogram:", cname, "(Log Transformation)"))
   
   
   
@@ -101,37 +101,64 @@ getOutliers <- function(x, cname, extreme = FALSE) {
 #' \code{qualStats} Creates a dataframe containing the contingency matrix
 #' for a categorical variable.
 #' 
-#' @param x Categorical variable with no more than 20 distinct levels 
+#' @param x Dataframe of variables to be analyzed
 #'
 #' @return A dataframe of descriptive statistics
 #' @author John James, \email{jjames@@datasciencesalon.org}
 #' @family Summarize Functions
 #' @export
-qualStats <- function(x) {
+qualStats <- function(x, cname) {
   
   # Obtain the contingency data from Hmisc describe class
   desc <- Hmisc::describe(x)
   
   # Extract the values and frequencies and compute the total frequencies
-  value <- as.data.frame(desc[[1]]$values$value, stringsAsFactors = FALSE)
-  freq <- as.data.frame(desc[[1]]$values$frequency)
-  freq <- rbind(freq, sum(desc[[1]]$values$frequency))
+  value <- as.data.frame(desc$values$value, stringsAsFactors = FALSE)
+  freq <- as.data.frame(desc$values$frequency)
+  freq <- rbind(freq, sum(desc$values$frequency))
   
   # Compute the proportions and convert the frequencies to characters
   # This conversion is performed in order to avoid converting the 
   # precision of the frequencies to that of the proportions.
-  prop <- freq / nrow(x)
+  prop <- freq / length(x)
   freq <- apply(freq, 1, as.character)
   
   # Combine the frequencies and proportions, and provide row and column names
   tbl <- cbind(freq, prop)
-  ttl <- c(sum(desc[[1]]$values$frequency), sum(prop))
+  ttl <- c(sum(desc$values$frequency), sum(prop))
   colnames(tbl) <- c('Frequency', 'Proportion')
-  rownames(tbl)  <- c(desc[[1]]$values$value, "Total")
+  rownames(tbl)  <- c(desc$values$value, "Total")
   
   # Transpose, and name the  and voila
   tbl <- t(tbl)
   return(tbl)
+}
+
+#------------------------------------------------------------------------------#
+#                              quickQuant                                      #
+#------------------------------------------------------------------------------#
+#' quickQuant
+#'
+#' \code{quantStats} Creates a dataframe containing the descriptive 
+#' statistics for a quantitative variable.
+#' 
+#' @param x Quantitative variable
+#' @param cname Variable name
+#'
+#' @return A dataframe of descriptive statistics
+#' @author John James, \email{jjames@@datasciencesalon.org}
+#' @family Summarize Functions
+#' @export
+quickQuant <- function(x) {
+  
+  nums <- colnames(x)[sapply(x, is.numeric)]
+  nums <- sort(nums)
+  
+  quant <- rbindlist(lapply(nums, function(cname) {
+    if (length(unique(x[[cname]])) > 10)
+      quantStats(x[[cname]], cname)
+  }))
+  return(quant)
 }
   
 #------------------------------------------------------------------------------#
@@ -143,12 +170,13 @@ qualStats <- function(x) {
 #' statistics for a quantitative variable.
 #' 
 #' @param x Quantitative variable
+#' @param cname Variable name
 #'
 #' @return A dataframe of descriptive statistics
 #' @author John James, \email{jjames@@datasciencesalon.org}
 #' @family Summarize Functions
 #' @export
-quantStats <- function(x) {
+quantStats <- function(x, cname) {
   
   options(scipen=100)
   options(digits=3)
@@ -157,9 +185,16 @@ quantStats <- function(x) {
   desc <- t(as.data.frame(desc$counts))
   rownames(desc) <- NULL
   desc <- as.data.frame(desc)
+  desc$term <- cname
   desc$missing <- sum(is.na(x))
   desc$pctMissing <- sum(is.na(x)) / length(x) * 100
-  desc <- desc[,c(1,2,14,3,4,5,7,9,10,11,13)]
+  if (length(desc) > 8) {
+    desc <- desc[,c(14,1,2,15,3,5,7,9,10,11,13)]
+  } else {
+    desc <- desc[,c(7,1,2,8,3,4,5,6)]
+  }
+  desc$skewness <- skewness(x)
+  desc$kurtosis <- kurtosis(x)
   
   return(desc)
 }
@@ -188,11 +223,11 @@ univariate <- function(x) {
     a <- list()
     
     if (is.numeric(x[[cname]]) | is.integer(x[[cname]])) {
-      a$tbl <- quantStats(x[[cname]])
+      a$tbl <- quantStats(x[[cname]], cname)
       a$outliers <- getOutliers(x, cname)
       a$plots <- quantPlots(x, cname, a$outliers$idx)
     } else {
-      a$tbl <- qualStats(x[cname])
+      a$tbl <- qualStats(x[[cname]], cname)
       a$plot <- plotBar(x[cname], yLab = 'Frequency', xLab = cname, legend = FALSE)
     }
     a 

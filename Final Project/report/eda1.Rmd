@@ -2,15 +2,26 @@
 ## Univariate Analysis
 ```{r univariate_analysis}
 load("../data/raw/ames_train.Rdata")
-df <- ames_train
+  df <- ames_train
 df <- reformat(df)
 df <- preprocess(df, "train")
 analysis <- univariate(df)
 ```
 
 ### Continuous Variables
+
+#### Summary
+```{r uni_quant_summary}
+qq <- quickQuant(df)
+knitr::kable(qq, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center")
+```
+
+
+#### Detail
 ```{r uni_continuous, results='asis'}
 nums <- colnames(df)[sapply(df, is.numeric)]
+nums <- sort(nums)
 quant <- analysis[nums]
 
 for (i in 1:length(quant)) {
@@ -20,6 +31,11 @@ for (i in 1:length(quant)) {
   do.call("grid.arrange", c(quant[[i]]$plots, ncol = nCol))
   cat("\n")
 
+  print(knitr::kable(quant[[i]]$tbl, digits = 2) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
+  cat('\n')
+  
+  
   print(knitr::kable(quant[[i]]$outliers$stats, digits = 2) %>%
   kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
   cat('\n')
@@ -30,6 +46,7 @@ for (i in 1:length(quant)) {
 ### Categorical Variables
 ```{r uni_categorical, results='asis'}
 cats <- colnames(df)[sapply(df, is.factor)]
+cats <- sort(cats)
 qual <- analysis[cats]
 
 for (i in 1:length(qual)) {

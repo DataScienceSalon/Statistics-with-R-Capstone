@@ -15,16 +15,24 @@ preprocess <- function(data, fileName) {
   
   df <- data
   
+  # Remove identifier
+  df$PID <- NULL
+  
   # Convert ordinals to numeric
   df <- convertOrdinals(df)
 
   # Collapse categorical levels
+  df$MS.SubClass <- factor(df$MS.SubClass)
   lvls <- c("40", "45", "75", "85", "180", "190")
   levels(df$MS.SubClass)[which(levels(df$MS.SubClass) %in% lvls)]  <- "Other"
   
   levels(df$MS.Zoning)[which(levels(df$MS.Zoning) != 'RL')]  <- "Other"
   
   levels(df$Lot.Config)[which(levels(df$Lot.Config) %in% c("FR2", "FR3"))]  <- "FR"
+  
+  levels(df$Condition.1)[which(levels(df$Condition.1) !=  "Norm")]  <- "Other"
+  
+  levels(df$Land.Contour)[which(levels(df$Land.Contour) !=  "Lvl")]  <- "Other"
   
   lvls <- c("Blueste", "Greens", "GrnHill", "Landmrk", "NPkVill")
   levels(df$Neighborhood)[which(levels(df$Neighborhood) %in% lvls)]  <- "Other"
@@ -52,7 +60,10 @@ preprocess <- function(data, fileName) {
   
   lvls <- c("Attchd", "BuiltIn", "Detchd")
   levels(df$Garage.Type)[which(!levels(df$Garage.Type) %in% lvls)]  <- "Other"
-  levels(df$Garage.Type)[which(is.na(df$Garage.Type))]  <- "Other"
+  lvls <- levels(df$Garage.Type)
+  lvls[length(lvls) + 1] <- "None"
+  df$Garage.Type <- factor(df$Garage.Type, levels = lvls)
+  df$Garage.Type[is.na(df$Garage.Type)]  <- "None"
   
   # Subset only properties sold under normal conditions
   df <- df %>% filter(Sale.Condition == "Normal")
@@ -72,37 +83,86 @@ preprocess <- function(data, fileName) {
   df$age.remod <- 2018 - df$Year.Remod.Add
   df$age.garage <- 2018 - df$Garage.Yr.Blt
   
-  # Log transfer numeric variables
-  df$area.log <- log(df$area+ 1)
-  df$age.garage.log <- log(df$age.garage + 1)
-  df$price.log <- log(df$price+ 1)
-  df$Lot.Area.log <- log(df$Lot.Area+ 1)
-  df$Overall.Qual.log <- log(df$Overall.Qual+ 1)
-  df$Overall.Cond.log <- log(df$Overall.Cond+ 1)
-  df$Year.Built.log <- log(df$Year.Built+ 1)
-  df$Year.Remod.Add.log <- log(df$Year.Remod.Add+ 1)
-  df$BsmtFin.SF.1.log <- log(df$BsmtFin.SF.1+ 1)
-  df$Bsmt.Unf.SF.log <- log(df$Bsmt.Unf.SF+ 1)
-  df$Total.Bsmt.SF.log <- log(df$Total.Bsmt.SF+ 1)
-  df$X1st.Flr.SF.log <- log(df$X1st.Flr.SF+ 1)
-  df$X2nd.Flr.SF.log <- log(df$X2nd.Flr.SF+ 1)
-  df$Bsmt.Full.Bath.log <- log(df$Bsmt.Full.Bath+ 1)
-  df$Bsmt.Half.Bath.log <- log(df$Bsmt.Half.Bath+ 1)
-  df$Full.Bath.log <- log(df$Full.Bath+ 1)
-  df$Half.Bath.log <- log(df$Half.Bath+ 1)
-  df$Bedroom.AbvGr.log <- log(df$Bedroom.AbvGr+ 1)
-  df$Kitchen.AbvGr.log <- log(df$Kitchen.AbvGr+ 1)
-  df$TotRms.AbvGrd.log <- log(df$TotRms.AbvGrd+ 1)
-  df$Fireplaces.log <- log(df$Fireplaces+ 1)
-  df$Garage.Yr.Blt.log <- log(df$Garage.Yr.Blt+ 1)
-  df$Garage.Cars.log <- log(df$Garage.Cars+ 1)
-  df$Garage.Area.log <- log(df$Garage.Area+ 1)
-  df$Wood.Deck.SF.log <- log(df$Wood.Deck.SF+ 1)
-  df$Open.Porch.SF.log <- log(df$Open.Porch.SF+ 1)
-  df$Mo.Sold.log <- log(df$Mo.Sold+ 1)
-  df$Yr.Sold.log <- log(df$Yr.Sold+ 1)
-  df$age.log <- log(df$age + 1)
-  df$age.remod.log <- log(df$age.remod  +1)
+  # Convert NAs in numeric's to zero where appropriate
+  df$Mas.Vnr.Area[is.na(df$Mas.Vnr.Area)] <- 0
+  
+  # Create log transformations
+  df$age.log <- log(df$age+1)
+  df$age.garage.log <- log(df$age.garage+1)
+  df$age.remod.log <- df$age.remod
+  df$area.log <- df$area
+  df$BsmtFin.SF.2.log <- log(df$BsmtFin.SF.2+1)
+  df$Enclosed.Porch.log <- log(df$Enclosed.Porch+1)
+  df$Garage.Area.log <- log(df$Garage.Area+1)
+  df$Lot.Area.log <- log(df$Lot.Area+1)
+  df$Low.Qual.Fin.SF.log <- log(df$Low.Qual.Fin.SF+1)
+  df$Mas.Vnr.Area.log <- log(df$Mas.Vnr.Area+1)
+  df$Open.Porch.SF.log <- log(df$Open.Porch.SF+1)
+  df$price.log <- log(df$price+1)
+  df$Screen.Porch.log <- log(df$Screen.Porch+1)
+  df$Total.Bsmt.SF.log <- log(df$Total.Bsmt.SF+1)
+  df$TotRms.AbvGrd.log <- log(df$TotRms.AbvGrd+1)
+  df$Wood.Deck.SF.log <- log(df$Wood.Deck.SF+1)
+  df$X1st.Flr.SF.log <- log(df$X1st.Flr.SF+1)
+  df$X2nd.Flr.SF.log <- log(df$X2nd.Flr.SF+1)
+  df$X3Ssn.Porch.log <- log(df$X3Ssn.Porch+1)
+  df$Bsmt.Unf.SF.sqrt <- sqrt(df$Bsmt.Unf.SF+1)
+  
+  # Remove variables
+  df$age <- NULL
+  df$age.remod <- NULL
+  df$age.garage <- NULL
+  df$area <- NULL
+  df$BsmtFin.SF.2 <- NULL
+  df$Enclosed.Porch <- NULL
+  df$Garage.Area <- NULL
+  df$Low.Qual.Fin.SF <- NULL
+  df$Mas.Vnr.Area <- NULL
+  df$Open.Porch.SF <- NULL
+  df$price <- NULL
+  df$Screen.Porch <- NULL
+  df$Total.Bsmt.SF <- NULL
+  df$TotRms.AbvGrd <- NULL
+  df$Wood.Deck.SF <- NULL
+  df$X1st.Flr.SF <- NULL
+  df$X2nd.Flr.SF <- NULL
+  df$Alley <- NULL
+  df$Condition.2 <- NULL
+  df$Heating <- NULL
+  df$Misc.Feature <- NULL
+  df$Roof.Matl <- NULL
+  df$Sale.Type <- NULL
+  df$Street <- NULL
+  df$Bsmt.Cond <- NULL
+  df$Bsmt.Half.Bath <- NULL
+  df$BsmtFin.SF.1 <- NULL
+  df$BsmtFin.Type.2 <- NULL
+  df$Electrical <- NULL
+  df$Exter.Cond <- NULL
+  df$Fence <- NULL
+  df$Functional <- NULL
+  df$Garage.Cond <- NULL
+  df$Garage.Qual <- NULL
+  df$Garage.Yr.Blt <- NULL
+  df$Kitchen.AbvGr <- NULL
+  df$Land.Slope <- NULL
+  df$Lot.Frontage <- NULL
+  df$Misc.Val <- NULL
+  df$Paved.Drive <- NULL
+  df$PID <- NULL
+  df$Pool.Area <- NULL
+  df$Pool.QC <- NULL
+  df$Utilities <- NULL
+  df$Year.Built <- NULL
+  df$Year.Remod.Add <- NULL
+  df$Bsmt.Unf.SF <- NULL
+  
+  
+  
+  
+  
+  
+  
   
   datastr <- capture.output(str(df))
   save(df, file = file.path("../data/preprocessed",paste0(fileName, ".Rdata")))

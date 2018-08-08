@@ -1,73 +1,104 @@
 ## Bivariate Analysis 
-```{r bivariate, results='asis'}
-bi <- bivariate(df, target = "price.log")
-analysis <- bi$analysis
-lmSummaries <- bi$summary
-
-lmSummaries <- lmSummaries %>% arrange(desc(adj.r.squared))
-print(knitr::kable(lmSummaries, digits = 2) %>%
-  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
-  cat('\n')
-
+```{r bivariate_data}
+load("../data/preprocessed/train.Rdata")
+target <- 'price.log'
 ```
-
 
 ### Continuous Variables
-```{r eda_bi_continuous, results='asis'}
-
-nums <- names(df)[sapply(df, is.numeric)]
-quant <- analysis[nums]
-for (i in 1:length(quant)) {
-
-  suppressMessages(print(quant[[i]]$plot))
-
-  print(knitr::kable(quant[[i]]$tbl, digits = 2) %>%
-  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
-  cat('\n')
-  
-  s1 <- broom::tidy(quant[[i]]$lm)
-  print(knitr::kable(s1, digits = 2) %>%
-  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
-  cat('\n')
-  s2 <- broom::glance(quant[[i]]$lm)
-  print(knitr::kable(s2, digits = 2) %>%
-  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
-  cat('\n')
-  
-  par(mfrow=c(2,2), pin=c(2,2))
-  plot(quant[[i]]$lm)
-  cat('\n')
-}
+```{r bi_quant_predictors}
+# Obtain numeric variables
+vars <- colnames(df)[sapply(df, is.numeric)]
+vars <- vars[vars != target]
 
 ```
 
-### Categorical Variables
-```{r eda_bi_categorical, results='asis'}
-
-cats <- names(df)[sapply(df, is.factor)]
-qual <- analysis[cats]
-for (i in 1:length(qual)) {
-
-  suppressMessages(print(qual[[1]]$box))
-  
-  suppressMessages(print(qual[[i]]$hist))
-
-  print(knitr::kable(qual[[i]]$tbl, digits = 2) %>%
-  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
-  cat('\n')
-  
-  s1 <- broom::tidy(qual[[i]]$lm)
-  print(knitr::kable(s1, digits = 2) %>%
-  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
-  cat('\n')
-  s2 <- broom::glance(qual[[i]]$lm)
-  print(knitr::kable(s2, digits = 2) %>%
-  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "center"))
-  cat('\n')
-  
-  par(mfrow=c(2,2), pin=c(2,2))
-  plot(qual[[i]]$lm)
-  cat('\n')
-}
-
+#### Target Correlation Analysis
+```{r target_cor}
+targetCorr <- analyzR::corrTest(df, target = target)
+knitr::kable(targetCorr, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
 ```
+
+#### Predictor Regression Summary
+```{r lm}
+models <- lapply(vars, function(v) {
+  m <- list()
+  fmla <- as.formula(paste(target, v, sep = "~"))
+  m$model <- lm(fmla, data = df)
+  m$modelFit <- tidy(m$model)
+  m$modelStats <- glance(m$model)
+  term <- data.frame(term = v, stringsAsFactors = FALSE)
+  m$modelStats <- cbind(term, m$modelStats)
+  m
+})
+names(models) <- vars
+```
+
+```{r prs}
+prs <- rbindlist(lapply(models, function(m) {
+  m$modelStats
+}))
+prs <- prs %>% arrange(-adj.r.squared)
+knitr::kable(prs, digits = 3) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
+#### Predictor Regression Analysis
+```{r bi_quant_regression, fig.height=10}
+for (i in 1:length(models)) {
+  # Print regression results and statistics
+  print(knitr::kable(models[[i]]$modelFit, digits = 3) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right"))
+  print(knitr::kable(models[[i]]$modelStats, digits = 3) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right"))
+  
+  # Print regression diagnostic plots
+  par(mfrow=c(3,2))
+  plot(df[[vars[i]]], df[[target]], main = paste(target, "vs", vars[i]), xlab = vars[i], ylab = target)
+  plot(models[[i]]$model$fitted.values, models[[i]]$model$model$price.log, main = "Predicted vs True", xlab = 'Predicted Log Price', ylab = "True Log Price")
+  plot(models[[i]]$model)
+}
+```
+
+#### Predictor Correlation Analysis
+```{r corr}
+# Create dataframe with dummy names, since the actual names won't fit on plot
+quantData <- df[vars]
+colnames(quantData) <- paste0("f", 1:ncol(quantData))
+
+# Compute correlation matrix
+M <- cor(quantData)
+
+# Plot correlation matrix
+corrplot(M, diag = FALSE, order = "FPC",
+         tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper")
+
+
+# Create pairwise correlation table
+corrTbl <- as.data.frame(as.table(M)) 
+
+# Create variable name cross-reference
+vNames <- data.frame(label = colnames(quantData), 
+                     Variable = colnames(df[vars]))
+
+# Add original names to the correlation table
+corrTbl <- merge(corrTbl, vNames, by.x = "Var1", by.y = "label")
+corrTbl <- merge(corrTbl, vNames, by.x = "Var2", by.y = "label")
+corrTbl$Label.1 <- as.character(corrTbl$Var1)
+corrTbl$Label.2 <- as.character(corrTbl$Var2)
+corrTbl$Variable.1 <- as.character(corrTbl$Variable.x)
+corrTbl$Variable.2 <- as.character(corrTbl$Variable.y)
+corrTbl$r <- corrTbl$Freq
+
+# Eliminate duplicates
+combinations = combn( colnames(df[vars]) , 2 , FUN = function( x ) { paste( x , collapse = "_" ) } )
+corrTbl = corrTbl[ paste( corrTbl$Variable.1  , corrTbl$Variable.2, sep = "_" ) %in% combinations , ]
+corrTbl <- corrTbl %>% filter(Variable.1 != Variable.2 & Freq > 0.5)  %>% arrange(-abs(Freq)) %>%
+  select('Label.1', 'Variable.1', 'Label.2', 'Variable.2', 'r')
+
+
+knitr::kable(corrTbl, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
+

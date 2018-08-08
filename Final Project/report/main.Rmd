@@ -29,6 +29,7 @@ knitr::knit_hooks$set(inline = function(x) {
 ```
 
 ```{r libraries}
+library(analyzR)
 library(broom)
 library(corrplot)
 library(data.table)
@@ -49,10 +50,9 @@ source("../R/preprocess.R")
 source("../R/reformat.R")
 source("../R/convertOrdinals.R")
 source("../R/univariate.R")
-source("../R/bivariate.R")
 source("../R/visual.R")
 ```
 
-```{r eda, child = 'eda1.rmd'}
+```{r eda, child = 'eda2.rmd'}
 ```
 
