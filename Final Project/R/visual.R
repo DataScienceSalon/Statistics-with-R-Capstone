@@ -42,40 +42,49 @@ plotHist <- function(data, xLab, plotTitle = NULL) {
 #------------------------------------------------------------------------------#
 #                           Plot Group Histogram                               #
 #------------------------------------------------------------------------------#
-#' plotGroupHist
+#' plotFactorHist
 #'
-#' \code{plotGroupHist} Renders histogram for multiple levels of a categorical 
+#' \code{plotFactorHist} Renders histogram for multiple levels of a categorical 
 #' variable
 #'
-#' @param data Data frame containing x and a grouping variable
+#' @param x Data frame containing the data 
+#' @param cVar Character string containing the name of the column of the continuous variable 
+#' @param factorVar Character string containing the name of the factor column
 #' @param xLab Capital case character string the group or subset of data being printed (optional)
-#' @param yLab Capital case character string describing y is being printed
 #' @param plotTitle Capital case character string for the plotTitle of the plot
 #'
 #' @return List containing a summary statistics and a histogram
 #' @author John James, \email{jjames@@datasciencesalon.org}
 #' @family visualization functions
 #' @export
-plotGroupHist <- function(data, xLab, groupVar, plotTitle = NULL) {
+plotFactorHist <- function(x, cVar, factorVar, xLab = NULL, plotTitle = NULL, 
+                           facets = FALSE) {
   
   if (is.null(plotTitle)) {
-    plotTitle <- paste(xLab, "by", groupVar)
+    if (is.null(xLab)) {
+      plotTitle <- paste(cVar, "by", factorVar)
+    } else {
+      plotTitle <- paste(xLab, "by", factorVar)
+    }
   }
   
-  colorCount <- length(unique(data[2]))
+  colorCount <- length(unique(x[factorVar]))
   myPal <- colorRampPalette(RColorBrewer::brewer.pal(11, "PiYG"))
   
-  hist <- ggplot2::ggplot(data = data, ggplot2::aes(x = data[[1]],  
-                                                    fill = data[[2]])) +
+  hist <- ggplot2::ggplot(data = x, ggplot2::aes(x = x[[cVar]],  
+                                                 fill = x[[factorVar]])) +
     ggplot2::geom_histogram(alpha = 0.5, position = "identity") +
     ggplot2::theme_minimal(base_size = 12) +
     ggplot2::theme(text = ggplot2::element_text(family="Open Sans"),
                    axis.ticks.x = ggplot2::element_blank()) +
     ggplot2::ggtitle(plotTitle) +
-    ggplot2::scale_fill_discrete(name=groupVar) +
+    ggplot2::scale_fill_discrete(name=factorVar) +
     ggplot2::xlab(xLab) 
   
-  
+  if (facets) {
+    fmla <- as.formula(paste(factorVar, ".", sep = "~"))
+    hist <- hist + facet_grid(fmla, scales = 'free')
+  }
   return(hist)
 }
 
@@ -86,42 +95,51 @@ plotGroupHist <- function(data, xLab, groupVar, plotTitle = NULL) {
 #'
 #' \code{plotBar} Renders a bar plot with bars sequenced by value left to right.
 #'
-#' @param data Data frame or vector containing a single categorical factor variable
-#' @param yLab Capital case character string describing the y variable
+#' @param x Data frame or vector containing a single categorical factor variable
+#' @param xVar Character string containing the variable to place on the x-axis
+#' @param yVar Character string containing the variable to place on the y-axis
 #' @param xLab Capital case character string containing the name of the variable x variable
+#' @param yLab Capital case character string describing the y variable
+#' @param horizontal Logical. If true, bars will be plotted horizontally
+#' @param legend Logical, if true the legend will be plotted.
 #' @param plotTitle Capital case character string for the title of the plot
+#' @param values. Logical, if true the y-values will be printed.
 #'
 #' @return Bar plot
 #' @author John James, \email{jjames@@datasciencesalon.org}
 #' @family visualization functions
 #' @export
-plotBar <- function(data, yLab, xLab, plotTitle = NULL, values = TRUE,
-                    horizontal = FALSE, legend = TRUE) {
+plotBar <- function(x, xVar, yVar, xLab = NULL, yLab = NULL, plotTitle = NULL, 
+                    values = FALSE, horizontal = FALSE, legend = TRUE) {
+  
+  # Convert x to dataframe
+  x <- as.data.frame(x, stringsAsFactors = FALSE)
+  
+  # Format xLab and yLab
+  if (is.null(xLab)) xLab <- xVar
+  if (is.null(yLab)) yLab <- yVar
   
   # Format title
   if (is.null(plotTitle)) {
-    plotTitle <- paste(yLab, "by", xLab, "Categorical Levels")
-  }
-  
-  # If raw data sent, prepare plot data as categorical level bar plot
-  if (ncol(data) == 1) {
-    data <- as.data.frame(table(data[[1]])) %>% filter(Freq > 0)
+    plotTitle <- paste(yLab, "by", xLab)
   }
   
   # If more than 5 categorical levels, make plot horizontal
-  if (nrow(data) > 5) horizontal <- TRUE
+  if (nrow(x[xVar]) > 10) horizontal <- TRUE
+  
+  # Format data
+  data <- data.frame(x = lapply(x[xVar], as.character), 
+                     y = x[yVar], stringsAsFactors = FALSE)
   
   # Render plot
-  myPal <- colorRampPalette(RColorBrewer::brewer.pal(11, "PiYG"))
   if (horizontal) {
     barPlot <- ggplot2::ggplot(data = data,
-                               ggplot2::aes(x = data[[1]],
+                               ggplot2::aes(x = reorder(data[[1]], data[[2]]),
                                             y = data[[2]],
-                                            fill = data[[1]])) +
-      scale_x_discrete(limits = rev(levels(data[[1]])))
+                                            fill = data[[1]])) 
   } else {
     barPlot <- ggplot2::ggplot(data = data,
-                               ggplot2::aes(x = data[[1]],
+                               ggplot2::aes(x = reorder(data[[1]], -data[[2]]),
                                             y = data[[2]],
                                             fill = data[[1]]))
   }
@@ -136,23 +154,18 @@ plotBar <- function(data, yLab, xLab, plotTitle = NULL, values = TRUE,
   if (values == TRUE) {
     barPlot <- barPlot + ggplot2::geom_text(ggplot2::aes(label=round(data[[2]], 3)),
                                             family="Open Sans",
-                                            vjust=.2, color="black",
-                                            size=5)
+                                            position = position_stack(vjust = .5),
+                                            color="white", size=3)
   }
   
   if (legend) {
     barPlot <- barPlot + 
       ggplot2::theme(text = ggplot2::element_text(family="Open Sans"),
-                     axis.title.x = ggplot2::element_blank(),
-                     axis.ticks.x = ggplot2::element_blank(),
-                     axis.text.x = ggplot2::element_blank(),
                      legend.position = "bottom")
     
   } else {
     barPlot <- barPlot + 
       ggplot2::theme(text = ggplot2::element_text(family="Open Sans"),
-                     axis.title.x = ggplot2::element_blank(),
-                     axis.ticks.x = ggplot2::element_blank(),
                      legend.position = "none")
   }
   
@@ -245,12 +258,12 @@ plotBox <- function(data, xLab = NULL, yLab, plotTitle = NULL, rotate = FALSE,
   
   if (is.null(xLab)) {
     bp <-  bp + ggplot2::theme(legend.position = "none",
-                     axis.text.y = ggplot2::element_blank(),
-                     axis.text.x = ggplot2::element_blank(),
-                     axis.ticks.x = ggplot2::element_blank(),
-                     axis.ticks.y = ggplot2::element_blank(),
-                     axis.title.x = ggplot2::element_blank(),
-                     axis.title.y = ggplot2::element_blank())
+                               axis.text.y = ggplot2::element_blank(),
+                               axis.text.x = ggplot2::element_blank(),
+                               axis.ticks.x = ggplot2::element_blank(),
+                               axis.ticks.y = ggplot2::element_blank(),
+                               axis.title.x = ggplot2::element_blank(),
+                               axis.title.y = ggplot2::element_blank())
   }
   
   if (rotate == TRUE) {
@@ -259,7 +272,7 @@ plotBox <- function(data, xLab = NULL, yLab, plotTitle = NULL, rotate = FALSE,
   } else {
     bp <- bp + ggplot2::labs(y = yLab, x = xLab, fill = xLab)
   }
-
+  
   
   
   return(bp)
@@ -273,32 +286,52 @@ plotBox <- function(data, xLab = NULL, yLab, plotTitle = NULL, rotate = FALSE,
 #'
 #' \code{plotScatter} Renders a scatterplot for two numerical variablesa
 #'
-#' @param data Data frame containing the quantitative variables
-#' @param xLab Capital case character string containing the name of the grouping or subset variable
-#' @param yLab Capital case character string containing the name of the y variable
+#' @param x Data frame containing the quantitative variables
+#' @param xVar Character string containing the name of the x variable column 
+#' @param yVar Character string containing the name of the y variable column 
+#' @param groupVar Optional character string containing the name of the gruping variable 
+#' @param xLab Capital case character string containing the label for xVar
+#' @param yLab Capital case character string containing the label for yVar
+#' @param groupName Capital case character string containing the label for groupVar
 #' @param plotTitle Capital case character string for title of plot
 #'
 #' @return Scatterplot object
 #' @author John James, \email{jjames@@datasciencesalon.org}
 #' @family visualization functions
 #' @export
-plotScatter <- function(data, xLab, yLab, plotTitle = NULL,
-                        smooth = TRUE) {
+plotScatter <- function(x, xVar, yVar, groupVar = NULL, xLab = NULL, 
+                        yLab = NULL, groupName = NULL, plotTitle = NULL,
+                        smooth = FALSE) {
   
-  if (is.null(plotTitle)) {
-    plotTitle <- paste(yLab, "by", xLab)
-  }
+  if (is.null(xLab)) xLab <- xVar
+  if (is.null(yLab)) yLab <- yVar
+  if (is.null(groupName)) groupName <- groupVar
+  if (is.null(plotTitle))  plotTitle <- paste(yLab, "by", xLab)
+  
+  data <- data.frame(x = x[[xVar]], y = x[[yVar]], group = x[[groupVar]])
+  
   
   myPal <- colorRampPalette(RColorBrewer::brewer.pal(11, "PiYG"))
   
-  scatter <- ggplot2::ggplot(data = data,
-                             ggplot2::aes(y = as.numeric(unlist(data[,1])),
-                                          x = as.numeric(unlist(data[,2])))) +
+  if (is.null(groupVar)) {
+    scatter <- ggplot2::ggplot(data = data,
+                               ggplot2::aes(y = as.numeric(unlist(data['y'])),
+                                            x = as.numeric(unlist(data['x'])))) 
+    
+  } else {
+    scatter <- ggplot2::ggplot(data = data,
+                               ggplot2::aes(y = as.numeric(unlist(data['y'])),
+                                            x = as.numeric(unlist(data['x'])),
+                                            colour = data[['group']])) +
+      ggplot2::theme(legend.position = "right")  +
+      ggplot2::scale_color_discrete(name = groupName)
+  }
+  
+  scatter <- scatter + 
     ggplot2::geom_point() +
-    ggplot2::theme_minimal(base_size = 16) +
-    ggplot2::theme(text = ggplot2::element_text(family="Open Sans"),
-                   legend.position = "right") +
+    ggplot2::theme_minimal(base_size = 12) +
     ggplot2::labs(x = xLab, y = yLab) +
+    ggplot2::theme(text = ggplot2::element_text(family="Open Sans")) +
     ggplot2::ggtitle(plotTitle)
   
   if (smooth) {
@@ -307,4 +340,59 @@ plotScatter <- function(data, xLab, yLab, plotTitle = NULL,
   
   return(scatter)
   
+}
+
+#------------------------------------------------------------------------------#
+#                                  Plot Coef                                   #
+#------------------------------------------------------------------------------#
+#' plotCoef
+#'
+#' \code{plotCoef} Renders a coefficient plot with error bars for an LM model
+#'
+#' @param x an LM model object
+#' @param plotTitle Capital case character string for title of plot
+#' @param intercept if FALSE, the intercept value will not be plotted
+#'
+#' @return Coefficient Plot 
+#' @author John James, \email{jjames@@datasciencesalon.org}
+#' @family visualization functions
+#' @export
+plotCoef <- function(x, plotTitle = NULL, intercept = FALSE) {
+  
+  library(broom)
+  
+  # Initialize parameters
+  if (is.null(plotTitle)) plotTitle <- "Coefficient Estimates"
+  
+  # Format data
+  data <- tidy(x)
+  data$lowerCI <- data$estimate - (1.95 * data$std.error)
+  data$upperCI <- data$estimate + (1.95 * data$std.error)
+  
+  # Remove intercept terms if requested
+  if (!intercept)  data <- data %>% filter(!grepl("*intercept*", term, ignore.case = TRUE))
+  
+  # Create factors for term (so that I can reorder them of coordinates are flipped)
+  data$term <- factor(data$term)
+  # Plot elements
+  points <- ggplot2::ggplot(data = data, ggplot2::aes(x = term, y = estimate))
+
+  
+  points <- points +
+    ggplot2::geom_linerange(aes(ymin = lowerCI, ymax = upperCI)) + 
+    ggplot2::geom_pointrange(aes(ymin = lowerCI, ymax = upperCI)) + 
+    ggplot2::geom_errorbar(aes(ymin = lowerCI, ymax = upperCI), width = 0.5) +
+    ggplot2::theme_minimal(base_size = 12) +
+    ggplot2::theme(text = ggplot2::element_text(family="Open Sans")) +
+    ggplot2::labs(x = "Term", y = "Estimate") +
+    ggplot2::ggtitle(plotTitle)
+  
+  if (!intercept) points <- points + ggplot2::labs(x = "Term", y = "Estimate (Intercept Omitted)") 
+  
+  if (nrow(data) > 5) {
+    points <- points + ggplot2::coord_flip() + 
+      ggplot2::scale_x_discrete(limits = rev(levels(data$term)))
+    
+  }
+  return(points)
 }

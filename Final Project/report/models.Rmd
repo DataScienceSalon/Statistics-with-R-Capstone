@@ -1,0 +1,106 @@
+```{r model_data}
+load("../data/preprocessed/train.Rdata")
+target <- 'price.log'
+```
+
+
+```{r formula}
+vars <- names(df)
+remove <- c("price.log", "Exterior.2nd", "Exter.Qual","Garage.Area.log","Total.Bsmt.SF.log")
+fullPredictors <- vars[! vars %in% remove]
+fullFmla <- as.formula(paste(target, paste(fullPredictors, collapse = "+"), sep = "~"))
+```
+
+```{r best_bma}
+full <- lm(fullFmla, data = df)
+best <- bas.lm(fullFmla,  data=df, prior= 'ZS-null', modelprior=uniform(), initprobs="eplogp", method = "MCMC") 
+
+# BMA Models
+bestHPM <- predict(bestBMA, estimator = "HPM")
+#bestBPM <- predict(bestBMA, estimator = "BPM")
+bestBMA <- predict(bestBMA, estimator = "BMA")
+
+```
+
+```{r best_step}
+bestForward <- stepAIC(full, direction = 'forward', trace = FALSE)
+bestForwardPred <- predict(bestForward, data = df)
+
+bestBackward <- stepAIC(full, direction = 'backward', trace = FALSE)
+bestBackwardPred <- predict(bestBackward, data = df)
+```
+
+```{r eval_in}
+y <- exp(df$price.log)
+
+# HPM Evalulation
+yHat <- exp(bestHPM$fit)
+RMSEBestHPM <- sqrt(mean((y - yHat)^2)) 
+
+# BMA Evalulation
+yHat <- exp(bestBMA$fit)
+RMSEBestBMA <- sqrt(mean((y - yHat)^2)) 
+
+# Forward Selection
+yHat <- exp(bestForward$fitted.values)
+RMSEBestFwd <- sqrt(mean((y - yHat)^2)) 
+
+# Backward Elimination
+yHat <- exp(bestBackward$fitted.values)
+RMSEBestBack <- sqrt(mean((y - yHat)^2)) 
+
+```
+
+
+```{r eval_out}
+load("../data/raw/ames_test.Rdata")
+df <- preprocess(ames_test, "test")
+y <- exp(df$price.log)
+
+# HPM Evalulation
+yHat <- predict(best, newdata = df, estimator = "HPM")
+yHat <- exp(yHat$fit)
+RMSEBestHPMOut <- sqrt(mean((y - yHat)^2)) 
+
+# BMA Evalulation
+# yHat <- predict(best, newdata = df, estimator = "BMA")
+# yHat <- exp(bestBMA$fit)
+# RMSEBestBMAOut <- sqrt(mean((y - yHat)^2)) 
+
+# Forward Selection
+yHat <- predict(bestForward, newdata = df)
+yHat <- exp(yHat)
+RMSEBestFwdOut <- sqrt(mean((y - yHat)^2)) 
+
+# Backward Elimination
+yHat <- predict(bestBackward, newdata = df)
+yHat <- exp(yHat)
+RMSEBestBackOut <- sqrt(mean((y - yHat)^2)) 
+
+```
+
+```{r ri_eval}
+load("../data/raw/ames_train.Rdata")
+train <- preprocess(ames_train, fileName = 'train')
+load("../data/raw/ames_test.Rdata")
+test <- preprocess(ames_test, fileName = 'test')
+vars <- ri$term
+train <- train[,vars]
+test <- test[,vars]
+y <- test$price.log
+vars <- vars[vars != 'price.log']
+eval <- rbindlist(lapply(seq_along(vars), function(v) {
+  f <- as.formula(paste(target, paste(vars[1:v], collapse = "+"), sep = "~"))
+  m <- lm(f, data = train)
+  yHat <- predict(m, newdata = test)
+  yHat <- exp(yHat)
+  RMSE <- sqrt(mean((y - yHat)^2)) 
+  a <- list()
+  a$model <- v
+  a$RMSE <- RMSE
+  a
+}))
+eval <- eval %>% arrange(RMSE)
+head(eval)
+```
+

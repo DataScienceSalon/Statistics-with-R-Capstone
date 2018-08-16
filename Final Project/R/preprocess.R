@@ -23,7 +23,7 @@ preprocess <- function(data, fileName) {
 
   # Collapse categorical levels
   df$MS.SubClass <- factor(df$MS.SubClass)
-  lvls <- c("40", "45", "75", "85", "180", "190")
+  lvls <- c("40", "45", "75", "85","150", "180", "190")
   levels(df$MS.SubClass)[which(levels(df$MS.SubClass) %in% lvls)]  <- "Other"
   
   levels(df$MS.Zoning)[which(levels(df$MS.Zoning) != 'RL')]  <- "Other"
@@ -89,8 +89,6 @@ preprocess <- function(data, fileName) {
   # Create log transformations
   df$age.log <- log(df$age+1)
   df$age.garage.log <- log(df$age.garage+1)
-  df$age.remod.log <- df$age.remod
-  df$area.log <- df$area
   df$BsmtFin.SF.2.log <- log(df$BsmtFin.SF.2+1)
   df$Enclosed.Porch.log <- log(df$Enclosed.Porch+1)
   df$Garage.Area.log <- log(df$Garage.Area+1)
@@ -110,9 +108,7 @@ preprocess <- function(data, fileName) {
   
   # Remove variables
   df$age <- NULL
-  df$age.remod <- NULL
   df$age.garage <- NULL
-  df$area <- NULL
   df$BsmtFin.SF.2 <- NULL
   df$Enclosed.Porch <- NULL
   df$Garage.Area <- NULL
@@ -126,42 +122,39 @@ preprocess <- function(data, fileName) {
   df$Wood.Deck.SF <- NULL
   df$X1st.Flr.SF <- NULL
   df$X2nd.Flr.SF <- NULL
+  df$X3Ssn.Porch <- NULL
   df$Alley <- NULL
   df$Condition.2 <- NULL
-  df$Heating <- NULL
+  # df$Heating <- NULL
   df$Misc.Feature <- NULL
   df$Roof.Matl <- NULL
   df$Sale.Type <- NULL
   df$Street <- NULL
-  df$Bsmt.Cond <- NULL
-  df$Bsmt.Half.Bath <- NULL
+  # df$Bsmt.Cond <- NULL
+  # df$Bsmt.Half.Bath <- NULL
   df$BsmtFin.SF.1 <- NULL
-  df$BsmtFin.Type.2 <- NULL
-  df$Electrical <- NULL
-  df$Exter.Cond <- NULL
-  df$Fence <- NULL
-  df$Functional <- NULL
-  df$Garage.Cond <- NULL
-  df$Garage.Qual <- NULL
+  # df$BsmtFin.Type.2 <- NULL
+  # df$Electrical <- NULL
+  # df$Exter.Cond <- NULL
+  # df$Fence <- NULL
+  # df$Functional <- NULL
+  # df$Garage.Cond <- NULL
+  # df$Garage.Qual <- NULL
   df$Garage.Yr.Blt <- NULL
-  df$Kitchen.AbvGr <- NULL
-  df$Land.Slope <- NULL
+  # df$Kitchen.AbvGr <- NULL
+  # df$Land.Slope <- NULL
+  # df$Misc.Val <- NULL
+  # df$Paved.Drive <- NULL
   df$Lot.Frontage <- NULL
-  df$Misc.Val <- NULL
-  df$Paved.Drive <- NULL
   df$PID <- NULL
   df$Pool.Area <- NULL
   df$Pool.QC <- NULL
-  df$Utilities <- NULL
+  # df$Utilities <- NULL
   df$Year.Built <- NULL
   df$Year.Remod.Add <- NULL
   df$Bsmt.Unf.SF <- NULL
-  
-  
-  
-  
-  
-  
+  df$Sale.Condition <- NULL
+  df$Yr.Sold <- NULL
   
   
   datastr <- capture.output(str(df))

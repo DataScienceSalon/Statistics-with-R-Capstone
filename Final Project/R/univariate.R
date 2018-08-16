@@ -188,13 +188,13 @@ quantStats <- function(x, cname) {
   desc$term <- cname
   desc$missing <- sum(is.na(x))
   desc$pctMissing <- sum(is.na(x)) / length(x) * 100
-  if (length(desc) > 8) {
+  if (ncol(desc) > 8) {
     desc <- desc[,c(14,1,2,15,3,5,7,9,10,11,13)]
   } else {
     desc <- desc[,c(7,1,2,8,3,4,5,6)]
   }
-  desc$skewness <- skewness(x)
-  desc$kurtosis <- kurtosis(x)
+  desc$skewness <- e1071::skewness(x)
+  desc$kurtosis <- e1071::kurtosis(x)
   
   return(desc)
 }
@@ -228,7 +228,8 @@ univariate <- function(x) {
       a$plots <- quantPlots(x, cname, a$outliers$idx)
     } else {
       a$tbl <- qualStats(x[[cname]], cname)
-      a$plot <- plotBar(x[cname], yLab = 'Frequency', xLab = cname, legend = FALSE)
+      plotData <- as.data.frame(table(x[[cname]]))
+      a$plot <- plotBar(plotData, xVar = 'Var1', yVar = "Freq", yLab = 'Frequency', xLab = cname, legend = FALSE)
     }
     a 
   })

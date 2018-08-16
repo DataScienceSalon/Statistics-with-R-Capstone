@@ -12,8 +12,6 @@
 #' @export
 convertOrdinals <- function(df) {
   
-  df <- ames_train
-  
   df$Lot.Shape <- factor(df$Lot.Shape, levels = c("IR3", "IR2", "IR1", "Reg"))
   df$Lot.Shape <- as.numeric(df$Lot.Shape)
   

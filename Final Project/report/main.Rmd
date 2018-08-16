@@ -20,6 +20,7 @@ knitr::opts_chunk$set(echo=FALSE,
                prompt=FALSE,
                tidy=TRUE,
                comment=NA,
+	             results = 'asis',
                message=FALSE,
                warning=FALSE)
 opts_knit$set(width=75, fig.height = 8)
@@ -30,6 +31,7 @@ knitr::knit_hooks$set(inline = function(x) {
 
 ```{r libraries}
 library(analyzR)
+library(BAS)
 library(broom)
 library(corrplot)
 library(data.table)
@@ -41,6 +43,7 @@ library(gridExtra)
 library(Hmisc)
 library(kfigr)
 library(kableExtra)
+library(MASS)
 library(psych)
 library(stats)
 library(xtable)
@@ -49,10 +52,13 @@ library(xtable)
 source("../R/preprocess.R")
 source("../R/reformat.R")
 source("../R/convertOrdinals.R")
+source("../R/corAnalysis.R")
+source("../R/importance.R")
+source("../R/interactions.R")
 source("../R/univariate.R")
 source("../R/visual.R")
 ```
 
-```{r eda, child = 'eda2.rmd'}
+```{r eda_2, child = 'eda2.rmd'}
 ```
 

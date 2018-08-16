@@ -1,3 +1,8 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
 ## Bivariate Analysis 
 ```{r bivariate_data}
 load("../data/preprocessed/train.Rdata")
@@ -14,37 +19,23 @@ vars <- vars[vars != target]
 
 #### Target Correlation Analysis
 ```{r target_cor}
-targetCorr <- analyzR::corrTest(df, target = target)
-knitr::kable(targetCorr, digits = 4) %>%
+analysis <- corAnalysis(df, target = target)
+analysis <- analysis %>% filter(abs(r) > .5 & (aR2.x > .5 | aR2.y > .5)) %>% arrange(-abs(r))
+knitr::kable(analysis, digits = 4) %>%
   kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
 ```
 
 #### Predictor Regression Summary
-```{r lm}
-models <- lapply(vars, function(v) {
-  m <- list()
-  fmla <- as.formula(paste(target, v, sep = "~"))
-  m$model <- lm(fmla, data = df)
-  m$modelFit <- tidy(m$model)
-  m$modelStats <- glance(m$model)
-  term <- data.frame(term = v, stringsAsFactors = FALSE)
-  m$modelStats <- cbind(term, m$modelStats)
-  m
-})
-names(models) <- vars
-```
-
-```{r prs}
-prs <- rbindlist(lapply(models, function(m) {
-  m$modelStats
-}))
-prs <- prs %>% arrange(-adj.r.squared)
-knitr::kable(prs, digits = 3) %>%
+```{r prs_quant, results='asis'}
+analysis <- analyzR::multiSLM(df, vars, target = target)
+models <- analysis$models
+prsQuant <- analysis$summary
+knitr::kable(prsQuant, digits = 3) %>%
   kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
 ```
 
 #### Predictor Regression Analysis
-```{r bi_quant_regression, fig.height=10}
+```{r bi_quant_regression, fig.height=10, results='asis'}
 for (i in 1:length(models)) {
   # Print regression results and statistics
   print(knitr::kable(models[[i]]$modelFit, digits = 3) %>%
@@ -62,43 +53,95 @@ for (i in 1:length(models)) {
 
 #### Predictor Correlation Analysis
 ```{r corr}
-# Create dataframe with dummy names, since the actual names won't fit on plot
-quantData <- df[vars]
-colnames(quantData) <- paste0("f", 1:ncol(quantData))
-
-# Compute correlation matrix
-M <- cor(quantData)
-
+corrData <- analyzR::correlation(df, target = "price.log", threshold = 0.5)
 # Plot correlation matrix
-corrplot(M, diag = FALSE, order = "FPC",
-         tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper")
+corrplot(corrData$matrix, diag = FALSE,  tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper")
 
-
-# Create pairwise correlation table
-corrTbl <- as.data.frame(as.table(M)) 
-
-# Create variable name cross-reference
-vNames <- data.frame(label = colnames(quantData), 
-                     Variable = colnames(df[vars]))
-
-# Add original names to the correlation table
-corrTbl <- merge(corrTbl, vNames, by.x = "Var1", by.y = "label")
-corrTbl <- merge(corrTbl, vNames, by.x = "Var2", by.y = "label")
-corrTbl$Label.1 <- as.character(corrTbl$Var1)
-corrTbl$Label.2 <- as.character(corrTbl$Var2)
-corrTbl$Variable.1 <- as.character(corrTbl$Variable.x)
-corrTbl$Variable.2 <- as.character(corrTbl$Variable.y)
-corrTbl$r <- corrTbl$Freq
-
-# Eliminate duplicates
-combinations = combn( colnames(df[vars]) , 2 , FUN = function( x ) { paste( x , collapse = "_" ) } )
-corrTbl = corrTbl[ paste( corrTbl$Variable.1  , corrTbl$Variable.2, sep = "_" ) %in% combinations , ]
-corrTbl <- corrTbl %>% filter(Variable.1 != Variable.2 & Freq > 0.5)  %>% arrange(-abs(Freq)) %>%
-  select('Label.1', 'Variable.1', 'Label.2', 'Variable.2', 'r')
-
-
-knitr::kable(corrTbl, digits = 4) %>%
+knitr::kable(corrData$table, digits = 4) %>%
   kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
 ```
 
+### Categorical Variables
+```{r bi_qual_predictors}
+# Obtain numeric variables
+vars <- colnames(df)[sapply(df, is.factor)]
+```
 
+#### Predictor Regression Summary
+```{r prs_qual, results='asis'}
+analysis <- analyzR::multiSLM(df, vars, target = target)
+models <- analysis$models
+prsQual <- analysis$summary
+knitr::kable(prsQual, digits = 3) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
+#### Predictor Regression Analysis
+```{r bi_qual_regression, fig.height=10, results='asis'}
+for (i in 1:length(models)) {
+  # Print regression results and statistics
+  print(knitr::kable(models[[i]]$modelFit, digits = 3) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right"))
+  print(knitr::kable(models[[i]]$modelStats, digits = 3) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right"))
+  
+  # Print regression diagnostic plots
+  print(plotFactorHist(df, target, vars[i], xLab = "Log Price", facets = TRUE))
+  par(mfrow=c(3,2))
+  plot(df[[vars[i]]], df[[target]], main = paste(target, "vs", vars[i]), xlab = vars[i], ylab = target)
+  plot(models[[i]]$model$fitted.values, models[[i]]$model$model$price.log, main = "Predicted vs True", xlab = 'Predicted Log Price', ylab = "True Log Price")
+  plot(models[[i]]$model)
+}
+```
+
+
+#### Predictor Association Analysis
+```{r target_as}
+assoc <- analyzR::association(df, target = target, threshold = 0.5)
+
+# Plot association matrix
+corrplot(assoc$matrix, diag = FALSE,  tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper")
+
+# Print asociationtable
+knitr::kable(assoc$table, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
+## Multivariate Analysis
+```{r qual_neighborhood}
+plotScatter(df, xVar = 'Overall.Qual', yVar = 'price.log', groupVar = 'Neighborhood',
+            plotTitle = "Log Price by Overall Quality and Neighborhood")
+```
+
+### Summary
+#### Relative Importance
+
+```{r relative_importance}
+ri <- rbind(prsQual, prsQuant)
+ri <- ri %>% arrange(-adj.r.squared)
+print(plotBar(ri[1:20,], xVar = 'term', xLab = "Term", yVar = 'adj.r.squared', yLab = "Proportion Variance Explained", values = FALSE, plotTitle = "Relative Importance of Top 20 Terms"))
+```
+
+#### Correlation of Features
+```{r corr_top}
+topFeatures <- ri$term[1:30] 
+df2 <- df %>% dplyr::select(topFeatures)
+corrData <- analyzR::correlation(df2, target = "price.log", threshold = 0.5, bigMatrix = 30)
+# Plot correlation matrix
+corrplot(corrData$matrix, diag = FALSE,  tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper", tl.col = 'black')
+
+knitr::kable(corrData$table, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
+#### Association of Top Features
+```{r ass_top}
+assoc <- analyzR::association(df2, target = target, threshold = 0.5, bigMatrix = 30)
+
+# Plot association matrix
+corrplot(assoc$matrix, diag = FALSE,  tl.pos = "td", tl.cex = 0.5, method = "color", type = "upper", tl.col = 'black')
+
+# Print asociationtable
+knitr::kable(assoc$table, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```

@@ -6,6 +6,26 @@ output:
       "--number-sections",
     ]
 ---
+```{r knitr_init, echo=FALSE, cache=FALSE}
+library(knitr)
+
+## Global options
+options(knitr.table.format = "html")
+options(max.print=100, scipen=999, width = 800)
+knitr::opts_chunk$set(echo=FALSE,
+	             cache=FALSE,
+               eval = TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+	             results = 'asis',
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75, fig.height = 8)
+knitr::knit_hooks$set(inline = function(x) {
+  prettyNum(x, big.mark=",")
+})
+```
 
 # Background
 
@@ -15,16 +35,35 @@ As a statistical consultant working for a real estate investment firm, your task
 
 In order to better assess the quality of the model you will produce, the data have been randomly divided into three separate pieces: a training data set, a testing data set, and a validation data set. For now we will load the training data set, the others will be loaded and used later.
 
-```{r load, message = FALSE}
-load("ames_train.Rdata")
-```
-
 Use the code block below to load any necessary packages
 
-```{r packages, message = FALSE}
-library(statsr)
-library(dplyr)
+```{r libraries, cache=FALSE}
 library(BAS)
+library(analyzR)
+library(broom)
+library(corrplot)
+library(data.table)
+library(MASS)
+library(dplyr)
+library(extrafont)
+library(ggplot2)
+library(gridExtra)
+library(Hmisc)
+library(kfigr)
+library(kableExtra)
+library(reshape2)
+library(stats)
+```
+
+```{r functions, cache=FALSE}
+source("../R/preprocess.R")
+source("../R/reformat.R")
+source("../R/convertOrdinals.R")
+source("../R/importance.R")
+source("../R/interactions.R")
+source("../R/univariate.R")
+source("../R/eval.R")
+source("../R/visual.R")
 ```
 
 ## Part 1 - Exploratory Data Analysis (EDA)
@@ -36,40 +75,307 @@ Do a detailed EDA of the ames_train data set, to learn about the structure of th
 After you have explored completely, submit the three graphs/plots that you found most informative during your EDA process, and briefly explain what you learned from each (why you found each informative).
 
 * * *
-
-NOTE: Write your written response to part 1 here. Delete this note before you submit your work.
-
-```{r creategraphs}
+```{r load_preprocess, results='asis'}
+load("../data/raw/ames_train.Rdata")
+df <- preprocess(ames_train, "train")
 ```
+
+```{r prs, results='asis'}
+target <- "price.log"
+vars <- colnames(df)[sapply(df, is.numeric)]
+vars <- vars[!vars %in% target]
+trash <- capture.output(analysis <- analyzR::multiSLM(df, vars, target = target))
+models <- analysis$models
+prsQuant <- analysis$summary
+
+vars <- colnames(df)[sapply(df, is.factor)]
+trash <- capture.output(analysis <- analyzR::multiSLM(df, vars, target = target))
+models <- analysis$models
+prsQual <- analysis$summary
+```
+
+The exploratory data analysis provided a view into its structure, shape, correlations, associations and outliers. Of particular interest were the relative importance of features, the value of the interactions between the variables, and the correlations among the predictors. Here are a few key insights. 
+
+### Relative Importance of Terms
+As indicated in `r kfigr::figr(label = "ri", prefix = TRUE, link = TRUE, type="Figure")`, overall quality, neighborhood and size were among the most important features. In fact, independent simple linear regressions showed that the variation in each of those variables independently accounted for over 50% of the variation in the log price.
+
+```{r ri, results='asis'}
+ri <- rbind(prsQual, prsQuant)
+ri <- ri %>% arrange(-adj.r.squared)
+
+print(plotBar(ri[1:20,], xVar = 'term', xLab = "Term", yVar = 'adj.r.squared', 
+              yLab = "Proportion Variance Explained", values = TRUE, 
+              horizontal = TRUE,  plotTitle = "Relative Importance of Top 20 Terms"))
+```
+
+`r kfigr::figr(label = "ri", prefix = TRUE, link = TRUE, type="Figure")`: Relative Importance of Terms
+
+### Relative Importance of Interaction Terms
+```{r interactions, cache=TRUE}
+inter <- interactions(df, target)
+top <- (inter %>% filter(aR2 > 0.5) %>% arrange(-aR2) %>% mutate(Term =  paste(Var1, "&", Var2)) %>% dplyr::select(Term, aR2))[1:10,]
+```
+Whereas individual terms accounted for up to `r round(ri$adj.r.squared[1] * 100, 0)`% of variance explained in the log price, the interaction terms had a more pronounced effect on the response. The top 10 interaction terms shown in `r kfigr::figr(label = "interaction", prefix = TRUE, link = TRUE, type="Figure")` accounted for up to `r round(top$aR2[1] * 100, 0)`% of variance explained in the log price.
+
+```{r plotInteractions}
+print(plotBar(top, xVar = 'Term', xLab = "Term", yVar = 'aR2', 
+              yLab = "Proportion Variance Explained", values = TRUE, 
+              horizontal = TRUE,  plotTitle = "Relative Importance of Top 10 Interaction Terms"))
+```
+
+`r kfigr::figr(label = "interaction", prefix = TRUE, link = TRUE, type="Figure")`: Relative Importance of Interaction Terms
+
+#### Correlation Analysis
+`r kfigr::figr(label = "corrplot", prefix = TRUE, link = TRUE, type="Figure")` highlights the correlations among 22 of the most important continuous variables. What it doesn't show is most notable. Yes, age and quality tend to be inversely correlated. Yes, a larger home will likely have greater numbers of rooms above ground. Yes, an older house will have an older garage.  Indeed quality and age tend to diverge.  Insofar as the top 20 continuous variables are strong candidates for a final model, they indicate no novel correlations to consider. 
+```{r scatter}
+vars <- ri$term[1:30]
+vars <- colnames(df[vars])[sapply(df[vars], is.numeric)]
+df2 <- df[,vars]
+corData <- analyzR::correlation(df2, target = target, bigMatrix = 30)
+corrplot(corData$matrix, method = "color", 
+         type = "upper", order = "FPC", number.cex = .4,
+         addCoef.col = "black",tl.cex = .5,
+         tl.col = "black", tl.srt = 90,
+         sig.level = 0.01, insig = "blank", 
+         diag = FALSE)
+```
+
+`r kfigr::figr(label = "corrplot", prefix = TRUE, link = TRUE, type="Figure")`: Correlation Plot
 
 * * *
 
 ## Part 2 - Development and assessment of an initial model, following a semi-guided process of analysis
 
 ### Section 2.1 An Initial Model
-In building a model, it is often useful to start by creating a simple, intuitive initial model based on the results of the exploratory data analysis. (Note: The goal at this stage is **not** to identify the "best" possible model but rather to choose a reasonable and understandable starting point. Later you will expand and revise this model to create your final model.
+In building a model, it is often useful to start by creating a simple,  intuitive initial model based on the results of the exploratory data analysis. (Note: The goal at this stage is **not** to identify the "best" possible model but rather to choose a reasonable and understandable starting point. Later you will expand and revise this model to create your final model.
 
 Based on your EDA, select *at most* 10 predictor variables from “ames_train” and create a linear model for `price` (or a transformed version of price) using those variables. Provide the *R code* and the *summary output table* for your model, a *brief justification* for the variables you have chosen, and a *brief discussion* of the model results in context (focused on the variables that appear to be important predictors and how they relate to sales price).
 
 * * *
+For this base model, we'll start with a most parsimonious containing just the 3 most important variables. We will use this as a benchmark against which we will compare more complex models. The code snippet in `r kfigr::figr(label = "fit_model", prefix = TRUE, link = TRUE, type="Figure")` creates the linear model including overall quality, the neighborhood and the area.
 
-NOTE: Write your written response to section 2.1 here. Delete this note before you submit your work.
+```{r fit_model, results='asis', echo=TRUE}
+target <- "price.log"
 
-```{r fit_model}
+# Creates a simple linear regression from the top 10 variables from relative importance computed above (not shown)
+alphaFmla <- as.formula(paste(target, paste(ri$term[1:3], collapse = "+"), sep = "~"))
+alpha <- lm(alphaFmla, data = df)
+alphaPred <<- predict(alpha, data = df)
+alphaSummary <- tidy(alpha)
+alphaStats <- glance(alpha)
+alphaR2 <- alphaStats$adj.r.squared
+alphaRMSE <- sqrt(mean((exp(df$price.log) - exp(alphaPred))^2))
 ```
+
+`r kfigr::figr(label = "fit_model", prefix = TRUE, link = TRUE, type="Figure")`: Model Alpha
+
+As shown in `r kfigr::figr(label = "model_stats", prefix = TRUE, link = TRUE, type="Table")`, this initial model accounts for approximately `r round(alphaStats$adj.r.squared * 100, 0)` percent of the variation in log price in the training set. That's a reasonably good result, given that there are just three variables in the regression equation.
+
+`r kfigr::figr(label = "model_stats", prefix = TRUE, link = TRUE, type="Table")`: Model Alpha Regression Summary Statistics
+```{r alpha_stats}
+
+knitr::kable(alphaStats, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
+`r kfigr::figr(label = "alpha_coef", prefix = TRUE, link = TRUE, type="Table")` outlines the model coefficient estimates, standard error, the statistic and the p-values for the linear model.
+
+`r kfigr::figr(label = "alpha_coef", prefix = TRUE, link = TRUE, type="Table")`: Model Alpha Coefficient Estimates
+```{r alpha_coef}
+knitr::kable(alphaSummary, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
+Since the response is on the log scale, we must back-transform the intercept and the coefficients to evaluate their effects on the linear scale. The following code snippet, `r kfigr::figr(label = "mse", prefix = TRUE, link = TRUE, type="Figure")`,  converts the intercept to a linear scale.
+
+```{r mse, echo=TRUE}
+RSS <- c(crossprod(alpha$residuals))
+MSE <- RSS / length(alpha$residuals)
+yBar <- exp(alphaSummary$estimate[1] + 1/2 * MSE)
+```
+`r kfigr::figr(label = "intercept", prefix = TRUE, link = TRUE, type="Figure")`: Intercept Back-transformation
+
+Hence, `r kfigr::figr(label = "intercept", prefix = TRUE, link = TRUE, type="Figure")` shows an intercept value of `r round(alphaSummary$estimate[1], 2)` on the log price scale which corresponds to an expected mean of `r round(yBar, 2)` dollars. Likewise, the coefficients must be back-transformed to have a clear interpretation of their effects on price. 
+
+```{r coefficients, echo=TRUE}
+effects <- rbindlist(lapply(seq_along(1:nrow(alphaSummary)), function(i) {
+  efx <- list()
+  efx$term <- alphaSummary$term[i]
+  if (i == 1) {
+    efx$increase <- 'NA'
+    efx$pct_change <- 0
+  } else if (i %in% c(30, 31, 32)) {
+    efx$increase <- "One Percent"
+    efx$pct_change <- 100 * (1.01^alphaSummary$estimate[i] - 1)
+  } else {
+    efx$increase <- 'One Unit'
+    efx$pct_change <- 100 * (exp(alphaSummary$estimate[i]) - 1)
+  }
+  efx
+}))
+```
+`r kfigr::figr(label = "coef", prefix = TRUE, link = TRUE, type="Figure")`: Coefficient Back-transformation
+
+```{r alpha_coef_plot, echo=FALSE}
+print(plotBar(effects, xVar = 'term', xLab = "Term", yVar = 'pct_change', 
+              yLab = "Percent Change in Price", values = TRUE, 
+              horizontal = TRUE,  plotTitle = "Coefficient Interpretation"))
+```
+
+`r kfigr::figr(label = "alpha_coef_plot", prefix = TRUE, link = TRUE, type="Figure")`: Coefficient Interpretation
+
+Now we can interpret the intercept and coefficients on the linear scale.  From `r kfigr::figr(label = "alpha_coef_plot", prefix = TRUE, link = TRUE, type="Figure")`, location seems have the strongest effect, both positive and negative,  on price.  Clearly some neighborhoods can command higher prices, than can others. Overall quality is also a strong indicator; however, it is worth noting that area has a nearly imperceptible effect on price, within the context of overall quality and location. 
 
 * * *
 
 ### Section 2.2 Model Selection
 
-Now either using `BAS` another stepwise selection procedure choose the "best" model you can, using your initial model as your starting point. Try at least two different model selection methods and compare their results. Do they both arrive at the same model or do they disagree? What do you think this means?
+Now either using `BAS` another step-wise selection procedure choose the "best" model you can, using your initial model as your starting point. Try at least two different model selection methods and compare their results. Do they both arrive at the same model or do they disagree? What do you think this means?
 
 * * *
 
-NOTE: Write your written response to section 2.2 here. Delete this note before you submit your work.
+#### Model Performance Summary
 
-```{r model_select}
+Having started with the three predictor model, we'll create a model containing the 10 most important features as determined by the percentage of variance in log price explained by each variable. Prior to model fitting, we'll remove variables which are highly correlated with more important variables. Once the data is prepared, we'll create four different models using the following four selection techniques:    
+1. Bayes Model Averaging including predictions for highest probability and best predictive models      
+2. Step-wise Forward Selection     
+3. Step-wise Backward Elimination       
+4. Step-wise Bidirectional Selection / Elimination   
+
+Models were fit, predictions calculated and the adjusted $R2$ and in-sample RMSE metrics were computed.
+
+```{r model_select, cache=TRUE}
+vars <- ri$term[1:10]
+remove <- c("price.log", "Exterior.2nd", "Exter.Qual","Garage.Area.log","Total.Bsmt.SF.log")
+betaVars <- vars[! vars %in% remove]
+betaFmla <- as.formula(paste(target, paste(betaVars, collapse = "+"), sep = "~"))
+
+beta <- lm(betaFmla, data = df)
+betaBAS <- bas.lm(betaFmla,  data=df, prior= 'ZS-null', modelprior=uniform(), initprobs="eplogp", method = "MCMC") 
+
+# BMA Models
+betaHPM <- predict(betaBAS, estimator = "HPM")
+betaBPM <- predict(betaBAS, estimator = "BPM")
+betaBMA <- predict(betaBAS, estimator = "BMA")
+
+betaForward <- stepAIC(beta, direction = 'forward', trace = FALSE)
+betaForwardPred <- predict(betaForward, data = df)
+
+betaBackward <- stepAIC(beta, direction = 'backward', trace = FALSE)
+betaBackwardPred <- predict(betaBackward, data = df)
+
+betaBi <- stepAIC(beta, direction = 'both', trace = FALSE)
+betaBiPred <- predict(betaBackward, data = df)
 ```
+
+
+As shown in `r kfigr::figr(label = "model_select_report", prefix = TRUE, link = TRUE, type="Figure")`, the BMA highest predictive model and the step models performed best with in-sample training RMSE.  
+
+```{r model_select_report}
+betaBASPred <- list(betaHPM, betaBPM, betaBMA)
+betaStats <- rbindlist(lapply(betaBASPred, function(b) {
+  r <- list()
+  r$model <- b$estimator
+  r$size <- length(variable.names(b))
+  r$RMSE <- sqrt(mean((exp(df$price.log)  - exp(b$Ypred))^2))
+  r$R2 <- betaBAS$R2[b$best[1]]
+  r
+}))
+
+# Forward selection
+betaForwardSummary <- summary(betaForward)
+betaForwardStats <- data.frame(model = "Step Forward",
+                              size = nrow(betaForwardSummary$coefficients),
+                              RMSE = sqrt(mean((exp(df$price.log) - exp(betaForward$fitted.values))^2)),
+                              R2 = betaForwardSummary$r.squared)
+betaStats <- rbind(betaStats, betaForwardStats)
+
+# Backward Elimination
+betaBackwardSummary <- summary(betaBackward)
+betaBackwardStats <- data.frame(model = "Step Backward",
+                              size = nrow(betaBackwardSummary$coefficients),
+                              RMSE = sqrt(mean((exp(df$price.log) - exp(betaBackward$fitted.values))^2)),
+                              R2 = betaBackwardSummary$r.squared)
+betaStats <- rbind(betaStats, betaBackwardStats)
+
+# Bidirectional
+betaBiSummary <- summary(betaBi)
+betaBiStats <- data.frame(model = "Step Both",
+                              size = nrow(betaBiSummary$coefficients),
+                              RMSE = sqrt(mean((exp(df$price.log) - exp(betaBi$fitted.values))^2)),
+                              R2 = betaBiSummary$r.squared)
+betaStats <- rbind(betaStats, betaBiStats)
+
+rmsePlot <- plotBar(betaStats, xVar = "model", yVar = "RMSE", xLab = "Model", yLab = "RMSE of Price", values = TRUE)
+r2Plot <- plotBar(betaStats, xVar = "model", yVar = "R2", xLab = "Model", yLab = "R2 (Adjusted)", values = TRUE)
+grid.arrange(rmsePlot, r2Plot, ncol = 1)
+```
+
+`r kfigr::figr(label = "model_select_report", prefix = TRUE, link = TRUE, type="Figure")`: Model Predictive Performance
+
+The models had nearly identical adjusted $R^2$ scores. Next, we'll take a closer look at the coefficients.
+
+#### Model Coefficient Summary
+The coefficient estimates for the each variable selection method are shown in `r kfigr::figr(label = "model_select_coef", prefix = TRUE, link = TRUE, type="Table")`.  
+
+`r kfigr::figr(label = "model_select_coef", prefix = TRUE, link = TRUE, type="Table")`: Model Coefficient Summary 
+```{r model_select_coef}
+hpm <- as.data.frame(confint(coef(betaBAS, estimator = 'HPM'))[,3])
+vars <- as.data.frame(rownames(hpm), stringsAsFactors = FALSE)
+hpm <- cbind(vars, hpm)
+colnames(hpm) <- c('Term', 'HPM')
+
+stepf <- as.data.frame(betaForward$coefficients)
+vars <- as.data.frame(rownames(stepf), stringsAsFactors = FALSE)
+stepf <- cbind(vars, stepf)
+colnames(stepf) <- c('Term', 'Forward')
+stepf$Term <- ifelse(stepf$Term == "(Intercept)", "Intercept", stepf$Term)
+
+models <- merge(hpm, stepf, by = 'Term')
+
+stepb <- as.data.frame(betaBackward$coefficients)
+vars <- as.data.frame(rownames(stepb), stringsAsFactors = FALSE)
+stepb <- cbind(vars, stepb)
+colnames(stepb) <- c('Term', 'Backward')
+stepb$Term <- ifelse(stepb$Term == "(Intercept)", "Intercept", stepb$Term)
+
+models <- merge(models, stepb, by = 'Term')
+
+step2 <- as.data.frame(betaBi$coefficients)
+vars <- as.data.frame(rownames(step2), stringsAsFactors = FALSE)
+step2 <- cbind(vars, step2)
+colnames(step2) <- c('Term', 'Bidirectional')
+step2$Term <- ifelse(step2$Term == "(Intercept)", "Intercept", step2$Term)
+
+models <- merge(models, step2, by = 'Term')
+
+# Place intercept row first
+intercept <- models %>% filter(Term == "Intercept")
+predictors <- models %>% filter(Term != "Intercept")
+models <- rbind(intercept, predictors)
+
+knitr::kable(models, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
+The step models were nearly identical, whereas the BMA highest probability model had a significantly higher intercept. The Bayesian model had a geometric mean (median) of \$`r round(exp(models$HPM[1]), 0)`, with all coefficients at zero; whereas the step models computed geometric means in the vicinity of \$`r round(exp(models$Backward[1]), 0)`, a 12 fold difference from the Bayesian approach. Given the different intercepts, comparisons of coefficient estimates must be made with caution. That said, the Bayesian coefficients suggest that certain neighborhoods had little to no effect on price.  
+
+The coefficient estimates for the bidirectional step-wise method are shown in `r kfigr::figr(label = "selected_model_coef", prefix = TRUE, link = TRUE, type="Figure")`.
+
+```{r selected_model_coef}
+plotCoef(betaForward)
+```
+
+`r kfigr::figr(label = "selected_model_coef", prefix = TRUE, link = TRUE, type="Figure")`: Selected Model Coefficient Plot
+
+As shown in `r kfigr::figr(label = "selected_model_stats", prefix = TRUE, link = TRUE, type="Table")`, this model had an adjusted coefficient of determination of `r round(glance(betaForward)$adj.r.squared, 2)`.
+
+`r kfigr::figr(label = "selected_model_stats", prefix = TRUE, link = TRUE, type="Table")`: Selected Model Summary
+```{r selected_model_stats, cache=FALSE}
+knitr::kable(glance(betaForward), digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
 
 * * *
 
@@ -77,11 +383,26 @@ NOTE: Write your written response to section 2.2 here. Delete this note before y
 One way to assess the performance of a model is to examine the model's residuals. In the space below, create a residual plot for your preferred model from above and use it to assess whether your model appears to fit the data well. Comment on any interesting structure in the residual plot (trend, outliers, etc.) and briefly discuss potential implications it may have for your model and inference / prediction you might produce.
 
 * * *
+The four plots in `r kfigr::figr(label = "beta_resid", prefix = TRUE, link = TRUE, type="Figure")` characterize the model residuals. 
 
-NOTE: Write your written response to section 2.3 here. Delete this note before you submit your work.
-
-```{r model_resid}
+```{r beta_resid, cache=FALSE, fig.height=8}  
+par(mfrow=c(2,2))
+plot(betaForward)  
 ```
+
+`r kfigr::figr(label = "beta_resid", prefix = TRUE, link = TRUE, type="Figure")`: Base Model Residual Plots 
+
+A pattern in the residuals vs. fitted plot, would expose non-linearity between the predictors and the response that was not captured by the model. This plot shows no distinct pattern of residuals as one scans the horizontal range of fitted values; however, three observations have been highlighted as potential outliers. The Normal Q-Q plot graphically depicts the degree to which the residuals are normally distributed.  Again, we have reasonably good alignment with normality although four outliers have been illuminated. The Scale-Location plot allows us to check for homoscedasticity, or equal variance across the ranges of the predictors.  We do observe a slight bow shape in standardized residuals at the upper range of predictions, but the spread of residuals appears to be reasonably consistent across the range.  Lastly the Residuals vs Leverage plot illuminates any influential outliers. Observations 90, 560, and 611 stand out; however, its worth noting that all observations were within cooks difference of the regression line. 
+
+An outlier influence analysis was conducted in which the regression equations were fit, with and without the outliers and is summarized in `r kfigr::figr(label = "outliers", prefix = TRUE, link = TRUE, type="Table")`.
+
+`r kfigr::figr(label = "outliers", prefix = TRUE, link = TRUE, type="Table")`: Outlier Analysis Summary 
+```{r outliers}
+outlierAnalysis <- analyzR::outliers(betaForward, target = 'price.log', observations = c(298, 423, 560, 611))
+knitr::kable(outlierAnalysis$summary, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+According to the analysis above, neither of the observations produce any significant change in the proportion of variance explained, nor do they have any pronounced effect on the regression line. Given their lack of influence on the regression equation, there is no justification for their removal.  
 
 * * *
 
@@ -91,11 +412,13 @@ You can calculate it directly based on the model output. Be specific about the u
 
 * * *
 
-NOTE: Write your written response to section 2.4 here. Delete this note before you submit your work.
-
-
 ```{r model_rmse}
+y <- exp(betaForward$model$price.log)
+yHat <- exp(betaForward$fitted.values)
+inRMSE <- sqrt(mean((y - yHat)^2)) 
 ```
+
+The RMSE was computed by back-transforming the observed and predicted values, then taking the square root of the mean squared distance between the points. Thusly, we have an in-sample RMSE of `r round(inRMSE, 3)`. 
 
 * * *
 
@@ -104,17 +427,24 @@ NOTE: Write your written response to section 2.4 here. Delete this note before y
 The process of building a model generally involves starting with an initial model (as you have done above), identifying its shortcomings, and adapting the model accordingly. This process may be repeated several times until the model fits the data reasonably well. However, the model may do well on training data but perform poorly out-of-sample (meaning, on a dataset other than the original training data) because the model is overly-tuned to specifically fit the training data. This is called “overfitting.” To determine whether overfitting is occurring on a model, compare the performance of a model on both in-sample and out-of-sample data sets. To look at performance of your initial model on out-of-sample data, you will use the data set `ames_test`.
 
 ```{r loadtest, message = FALSE}
-load("ames_test.Rdata")
+load("../data/raw/ames_test.Rdata")
 ```
 
 Use your model from above to generate predictions for the housing prices in the test data set.  Are the predictions significantly more accurate (compared to the actual sales prices) for the training data than the test data?  Why or why not? Briefly explain how you determined that (what steps or processes did you use)?
 
 * * *
 
-NOTE: Write your written response to section 2.5 here. Delete this note before you submit your work.
-
 ```{r initmodel_test}
+df <- preprocess(ames_test, "test")
+y <- df$price.log
+yHat <- predict(betaForward, newdata = df)
+y <- exp(y)
+yHat <- exp(yHat)
+outRMSE <- sqrt(mean((y - yHat)^2)) 
+RMSEPctChg <- (inRMSE - outRMSE) / inRMSE * 100
 ```
+
+The out of sample RMSE was `r round(outRMSE, 3)`, actually a `r round(RMSEPctChg, 2)` percent *improvement* on the in sample performance.
 
 * * *
 
@@ -132,11 +462,55 @@ Provide the summary table for your model.
 
 * * *
 
-NOTE: Write your written response to section 3.1 here. Delete this note before you submit your work.
+```{r model_playground, results='asis', cache=TRUE}
+load("../data/raw/ames_train.Rdata")
+train <- preprocess(ames_train, "train")
+load("../data/raw/ames_test.Rdata")
+test <- preprocess(ames_test, "test")
+target <- "price.log"
 
+# # Remove outliers
+# outliers <- c(298, 423, 560, 611)
+# train <- train[-outliers,]
 
-```{r model_playground}
+# Remove highly correlated and missing values
+remove <- c("Exter.Qual", "MS.Zoning", "TotRms.AbvGrd.log", "Full.Bath")
+train <- train %>% dplyr::select(-remove)
+
+# Perform grid search for best model
+mainAR2 <- seq(.3, .9, .1)  
+interAR2 <- seq(.72, .8, .03)
+
+evals <- list()
+for (i in 1:length(mainAR2)) {
+  for (j in 1:length(interAR2)) {
+    e <- eval(train, test, mainAR2 = mainAR2[i], interAR2 = interAR2[j], target = target)
+    evals <- c(evals, list(e))
+  }
+}
 ```
+
+The final model is summarized in `r kfigr::figr(label = "eval_report", prefix = TRUE, link = TRUE, type="Table")`.
+
+`r kfigr::figr(label = "eval_report", prefix = TRUE, link = TRUE, type="Table")`: Final Model Summary 
+```{r eval_report}
+eval_report <- rbindlist(lapply(evals, function(e) {
+  e$table
+}))
+
+eval_report <- eval_report %>% arrange(RMSE_test)
+bestIdx <- eval_report$idx[1]
+best <- evals[[1]]$data[[bestIdx]]$m
+bestRMSE <- evals[[1]]$data[[bestIdx]]$RMSE_test
+a <- anova(best)
+
+eval_report <- eval_report %>% arrange(RMSE_test)
+knitr::kable(glance(best), digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+knitr::kable(a, digits = 4) %>%
+  kableExtra::kable_styling(bootstrap_options = c("hover", "condensed", "responsive"), full_width = T, position = "float_right")
+```
+
 
 * * *
 
@@ -146,7 +520,29 @@ Did you decide to transform any variables?  Why or why not? Explain in a few sen
 
 * * *
 
-NOTE: Write your written response to section 3.2 here. Delete this note before you submit your work.
+The univariate and bivariate exploratory data analyses revealed several variables, including the target, with significant right skewed distributions. The following variables in the dataset were log transformed:  
+
+* age.log
+* age.garage.log
+* BsmtFin.SF.2.log
+* Enclosed.Porch.log
+* Garage.Area.log
+* Lot.Area.log
+* Low.Qual.Fin.SF.log
+* Mas.Vnr.Area.log
+* Open.Porch.SF.log
+* price.log
+* Screen.Porch.log
+* Total.Bsmt.SF.log
+* TotRms.AbvGrd.log
+* Wood.Deck.SF.log
+* X1st.Flr.SF.log
+* X2nd.Flr.SF.log
+* X3Ssn.Porch.log
+* Bsmt.Unf.SF.sqrt
+
+The transformation provided nearly normal distributions vis-a-vis the log price.
+
 
 ```{r model_assess}
 ```
@@ -158,8 +554,14 @@ NOTE: Write your written response to section 3.2 here. Delete this note before y
 Did you decide to include any variable interactions? Why or why not? Explain in a few sentences.
 
 * * *
+Refer to `r kfigr::figr(label = "interaction", prefix = TRUE, link = TRUE, type="Figure")` for a list of the top 10 interactions. The proportion of variance explained was computed for a grid of pairwise variable interactions. The following interactions had adjusted $R2$ scores above 0.75.  
+1. Neighborhood and area
+2. Neighborhood and Overall.Qual   
+3. Overall.Qual and Lot.Area.Log   
+4. MS.Subclass and Area
 
-NOTE: Write your written response to section 3.3 here. Delete this note before you submit your work.
+Interactions 1 and 4 above were included in the final model.
+
 
 ```{r model_inter}
 ```
@@ -172,9 +574,18 @@ What method did you use to select the variables you included? Why did you select
 
 * * *
 
-NOTE: Write your written response to section 3.4 here. Delete this note before you submit your work.
+Simple linear regression models were calculated during the bivariate exploratory analysis to ascertain the relative importance of each variable from the perspective of proportion of variance explained.  Various interactions were similarly tested.  Next the terms and interactions with adjusted $R^2$ values above a designated threshold were selected for model evaluation. A grid search was performed adding each term and interaction to the model, one-by-one. Then each of the four selection methods were implemented to create four different models for each set of terms and interactions. 
 
-```{r model_select}
+1. Bayes Model Averaging  (HPM, MPM, BPM, BMA)   
+2. Step-wise Forward Selection     
+3. Step-wise Backward Elimination   
+4. Step-wise Bidirectional Selection / Elimination    
+
+Over 250 such models were computed to ascertain the model with the lowest in-sample and out-of-sample RMSE.  Step-wise bidirectional selection / elimination provided the lowest RMSE on the test data.  
+
+
+
+```{r model_select_2}
 ```
 
 * * *
@@ -185,7 +596,7 @@ How did testing the model on out-of-sample data affect whether or how you change
 
 * * *
 
-NOTE: Write your written response to section 3.5 here. Delete this note before you submit your work.
+The out-of-sample RMSE computed above was the basis by which the final model was chosen.
 
 ```{r model_testing}
 ```
@@ -200,7 +611,18 @@ For your final model, create and briefly interpret an informative plot of the re
 
 * * *
 
-NOTE: Write your written response to section 4.1 here. Delete this note before you submit your work.
+
+
+```{r resid, fig.height=8}
+par(mfrow=c(2,2))
+plot(best)
+```
+
+`r kfigr::figr(label = "final", prefix = TRUE, link = TRUE, type="Figure")`: Final Model Residual Plots
+
+A pattern in the Residuals vs Fitted plot would indicate a non-linear relationship between the predictors and the response. The residuals appear to be evenly distributed across the range of predicted values and no pattern suggesting that no non-linear relationship was extant.  Three outliers have been identified, but they did not appear to have influence on the regression line or the residuals distribution.
+
+The Normal Q-Q plot indicates that the residuals have a reasonably normal distribution; however, the outliers suggest that we have more extreme values than those that would come from a theoretical distribution.  The Scale-Location plot reveals a slight decline in standardized residuals at the upper range of predictions, but the spread of residuals appears to be reasonably consistent across the range.  Lastly the Residuals vs Leverage plot illuminates three outliers; however, its worth noting that all observations were within cooks distance of the regression line.
 
 * * *
 
@@ -210,7 +632,7 @@ For your final model, calculate and briefly comment on the RMSE.
 
 * * *
 
-NOTE: Write your written response to section 4.2 here. Delete this note before you submit your work.
+The final model RMSE measures were `r round(evals[[1]]$data[[bestIdx]]$RMSE_train, 1)` and `r round(evals[[1]]$data[[bestIdx]]$RMSE_test, 1)` for the training and test sets, respectively.  This corresponds to a prediction accuracy on out of sample data of approximately `r round(evals[[1]]$data[[bestIdx]]$RMSE_test / mean(ames_test$price) * 100, 2)` percent, relative to the mean home price.  
 
 * * *
 
@@ -220,7 +642,10 @@ What are some strengths and weaknesses of your model?
 
 * * *
 
-NOTE: Write your written response to section 4.3 here. Delete this note before you submit your work.
+A strength of the model is the extent to which it aligns with real estate industry domain knowledge and expectations. A breadth of factors including external, internal and overall quality, location, size, and structural foundation have been included to provide a profile of a home that was as rich as possible, while avoiding multicollinearity.  Most notably the model explains `r round(glance(best)$adj.r.squared, 2)`% of the variance in log price.
+
+That said, a `r round(evals[[1]]$data[[bestIdx]]$RMSE_test / mean(ames_test$price) * 100, 2)`% prediction accuracy does leave room for improvement. Given more time, other machine learning techniques such as neural networks, or tree-based models could be evaluated.
+
 
 * * *
 
@@ -235,15 +660,27 @@ You will use the “ames_validation” dataset to do some additional assessment 
 * From this result, does your final model properly reflect uncertainty?
 
 ```{r loadvalidation, message = FALSE}
-load("ames_validation.Rdata")
+load("../data/raw/ames_validation.Rdata")
 ```
 
 * * *
 
-NOTE: Write your written response to section 4.4 here. Delete this note before you submit your work.
-
 ```{r model_validate}
+y <- ames_validation$price
+validation <- preprocess(ames_validation, "validation")
+yHat <- predict(best, newdata = validation, interval = 'predict')
+yHat <- exp(yHat)
+RMSE <- sqrt(mean((y - yHat[,1])^2))
+ames_validation$yHat <- yHat[,1]
+ames_validation$lwr <- yHat[,2]
+ames_validation$upr <- yHat[,3]
+ames_validation$error <- abs(ames_validation$price - ames_validation$yHat)
+ames_validation$pctError <- abs(ames_validation$price - ames_validation$yHat) / ames_validation$price * 100
+
+pctCI <- nrow(subset(ames_validation, ((price < upr) & (price > lwr)))) / nrow(ames_validation) * 100
 ```
+
+The final model RMSE on the validation set was \$`r round(RMSE, 2)`, which was within `r round((1 - (RMSE / bestRMSE)) * 100, 2)`% of the test RMSE. From an accuracy position, `r round(pctCI, 2)`% of the predictions were inside the 95% prediction interval. Indeed this result reflects the uncertainty of the model predictions.
 
 * * *
 
@@ -253,6 +690,16 @@ Provide a brief summary of your results, and a brief discussion of what you have
 
 * * *
 
-NOTE: Write your written response to part 5 here. Delete this note before you submit your work.
+```{r conclusion}
+stats <- glance(best)
+```
 
-* * *
+A multiple linear regression was calculated to predict housing prices in Ames Iowa based upon 12 independent variables and two interaction variables. A significant regression equation was found (F(`r stats$df`, `r stats$df.residual`) = `r round(stats$statistic, 2)`, p < .05), with an adjusted $R^2$ of `r round(stats$adj.r.squared, 3)`. The RMSE measures were \$`r round(evals[[1]]$data[[bestIdx]]$RMSE_train, 2)`, \$`r round(evals[[1]]$data[[bestIdx]]$RMSE_test, 2)`, and \$`r round(RMSE, 2)` for the training, test and validation sets, respectively. Approximately  `r round(pctCI, 2)`% of the true prices were within the 95% prediction interval.
+
+As a benchmark, a three variable regression equation was also found  (F(`r alphaStats$df`, `r alphaStats$df.residual`) = `r round(alphaStats$statistic, 2)`, p < .05), with an adjusted $R^2$ of `r round(alphaStats$adj.r.squared, 3)`. With three predictors, neighborhood, overall quality and age, the model achieved an in-sample RMSE of \$`r round(alphaRMSE, 2)`. 
+
+This indicates that overall quality, the neighborhood, and age accounted for a significant proportion of the variance explained and were the key factors which determine home prices.  
+
+Several interactions were also noted to have a significant effect on price, notably neighborhood and size, size and subclass, and overall quality and sub class.
+
+With more time, other techniques such as ridge regression/lasso, random forests and neural networks could be applied to improve upon RMSE.

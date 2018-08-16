@@ -2,9 +2,7 @@
 ## Univariate Analysis
 ```{r univariate_analysis}
 load("../data/raw/ames_train.Rdata")
-  df <- ames_train
-df <- reformat(df)
-df <- preprocess(df, "train")
+df <- preprocess(ames_train, "train")
 analysis <- univariate(df)
 ```
 
@@ -50,7 +48,7 @@ cats <- sort(cats)
 qual <- analysis[cats]
 
 for (i in 1:length(qual)) {
-
+  
   suppressMessages(print(qual[[i]]$plot))
 
   print(knitr::kable(qual[[i]]$tbl, digits = 2) %>%
